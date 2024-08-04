@@ -1,0 +1,5 @@
+static/tasks/
+backups/
+__pycache__
+.env
+.venv
