@@ -18,3 +18,9 @@ class AdminEditText(StatesGroup):
     number_task = State()
     text = State()
     confirmation = State()
+
+class AdminRejectTask(StatesGroup):
+    place = State()
+    user_id = State()
+    number_task = State()
+    couse = State()

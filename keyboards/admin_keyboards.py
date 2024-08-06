@@ -78,10 +78,29 @@ def admin_show_full_task_kb(number_task):
     keyboard = InlineKeyboardMarkup().add(btn1, btn2).add(btn3, btn4)
     return keyboard
 
-def admin_edit_task_text_conf():
+def admin_edit_task_text_conf_kb():
     btn1 = InlineKeyboardButton(text='Всё верно', callback_data='admin_edit_text_conf')
     btn2 = InlineKeyboardButton(text='<<', callback_data='admin_edit_text_back')
     keyboard = InlineKeyboardMarkup().add(btn1, btn2)
     return keyboard
 
 
+def admin_delete_task_conf_kb(number_task):
+    btn1 = InlineKeyboardButton(text='Уверен', callback_data=f'admin_delete_conf:{number_task}')
+    btn2 = InlineKeyboardButton(text='<<', callback_data=f'admin_delete_cancel')
+    keyboard = InlineKeyboardMarkup().add(btn1).add(btn2)
+    return keyboard
+
+def admin_checking_kb(number_task, user_id, place=0):
+    btn1 = InlineKeyboardButton(text='Принять', callback_data=f'accept_admin__task:{number_task}:{user_id}:{place}')
+    btn2 = InlineKeyboardButton(text='Отклонить', callback_data=f'reject_admin_task:{number_task}:{user_id}:{place}')
+    btn3 = InlineKeyboardButton(text='<', callback_data=f'admin_last_checking:{number_task}:{place-1}')
+    btn4 = InlineKeyboardButton(text='>', callback_data=f'admin_next_checking:{number_task}:{place+1}')
+    keyboard = InlineKeyboardMarkup().add(btn3, btn4).add(btn1, btn2)
+    return keyboard
+
+
+def admin_reject_task_kb():
+    btn1 = InlineKeyboardButton(text='<<', callback_data='admin_reject_task_cancel')
+    keyboard = InlineKeyboardMarkup().add(btn1)
+    return keyboard

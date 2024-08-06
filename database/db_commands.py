@@ -60,12 +60,34 @@ def adding_new_activa_task(user_id, task_number):
     except:
         return 0
     
+@sync_to_async 
+def adding_new_history_task(user_id, task_number):
+    try:
+        with Session(autoflush=False, bind=engine) as session:
+            obj = session.query(TaskHistory).filter(TaskHistory.user_id == user_id).first()
+            obj.history_tasks += f'{task_number} '
+            session.commit()
+            return 1
+    except:
+        return 0   
+
+    
 @sync_to_async
 def delete_active_task(user_id, task_number):
     try:
         with Session(autoflush=False, bind=engine) as session:
             obj = session.query(TaskHistory).filter(TaskHistory.user_id == user_id).first()
             obj.active_tasks = obj.active_tasks.replace(f'{task_number} ', '')
+            session.commit()
+    except:
+        pass
+
+@sync_to_async
+def delete_history_task(user_id, number_task):
+    try:
+        with Session(autoflush=False, bind=engine) as session:
+            obj = session.query(TaskHistory).filter(TaskHistory.user_id == user_id).first()
+            obj.history_tasks = obj.history_tasks.replace(f'{number_task} ', '')
             session.commit()
     except:
         pass
@@ -117,6 +139,13 @@ def get_user_data(user_id):
             return data
     except:
         return 0
+
+@sync_to_async
+def adding_balance(user_id, reward):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.balance = obj.balance + int(reward)
+        session.commit()
 
 
 @sync_to_async
@@ -248,6 +277,14 @@ def get_task_datas(id):
         }
         return data
     
+
+@sync_to_async
+def delete_task(id):
+    with Session(autoflush=False, bind=engine) as session:
+        session.query(Task).filter(Task.id == id).delete()
+        session.commit()
+        
+
 @sync_to_async
 def edit_task_text(id, text):
     with Session(autoflush=False, bind=engine) as session:
@@ -267,6 +304,12 @@ def get_all_task_in_category(category):
     with Session(autoflush=False, bind=engine) as session:
         tasks = session.query(Task).filter(Task.category == category).all()
         return tasks
+    
+@sync_to_async
+def get_count_task_in_category(category):
+    with Session(autoflush=False, bind=engine) as session:
+        count = session.query(Task).filter(Task.category == category).count()
+        return count
     
 
 @sync_to_async
@@ -318,6 +361,20 @@ def get_users_task_active_by_category(user_id, category, task_progress):
             if int(user_id) in task_progress[int(task)]['users']['checking']:
                 tasks.remove(task)
         return tasks
+    
+@sync_to_async
+def get_users_task_history_by_category(user_id, category, task_progress):
+    with Session(autoflush=False, bind=engine) as session:
+        tasks_in_process = session.query(TaskHistory).filter(TaskHistory.user_id == user_id).first()
+        tasks_in_process = tasks_in_process.history_tasks.split(' ')
+        tasks = []
+        for task in tasks_in_process:
+            if task != '':
+                obj = session.query(Task).filter(Task.id == int(task)).first()
+                if obj.category == category:
+                    tasks.append(obj.id)
+        return tasks
+
     
 @sync_to_async
 def is_time_remaining(start_time, duration_minutes):

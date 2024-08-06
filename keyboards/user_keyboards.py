@@ -117,11 +117,20 @@ def accept_new_task(number):
 async def get_all_category_kb():
     categories = await get_category()
     keyboard = InlineKeyboardMarkup()
+    btns = 0
     if (len(categories) != 0):
         for cat in categories:
+            count = await get_count_task_in_category(cat.name)
+            if count == 0:
+                continue
             btn = InlineKeyboardButton(text=cat.name, callback_data=f'task_category:{cat.name}')
             keyboard.add(btn)
+            btns += 1
     else:
+        btn = InlineKeyboardButton(text='Ни одной категории еще нет', callback_data='nothing')
+        keyboard.add(btn)
+        btns += 1
+    if btns == 0:
         btn = InlineKeyboardButton(text='Ни одной категории еще нет', callback_data='nothing')
         keyboard.add(btn)
     return keyboard
