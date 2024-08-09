@@ -3,6 +3,7 @@ import asyncio
 import random
 import datetime
 import threading
+import openpyxl
 import dill as pickle
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -669,9 +670,74 @@ async def user_my_tasks_in_cat(callback_query: types.CallbackQuery):
 
 ## Навигация в моих оцененных хадачах
 @user_dp.callback_query_handler(lambda c: 'my_done_tasks' in c.data)
-async def user_my_task_history(callback_query: types):
+async def user_my_task_history(callback_query: types.CallbackQuery):
     cat = callback_query.data.split(':')[1]
+    tasks = await get_users_task_history_by_category(str(callback_query.from_user.id), cat)
+    if (len(tasks) != 0) and (tasks != ['']) and (tasks[0] != ''):
+        task = await get_task_datas(int(tasks[0]))
+        if callback_query.from_user.id in tasks_progress[task["id"]]["users"]["done"]:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task["start_date"]}',
+                reply_markup=user_task_history_kb(place=0, category=cat, hand=True),
+                parse_mode='HTML'
+            )
+        elif callback_query.from_user.id in tasks_progress[task["id"]]["users"]["rejected"]:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task["start_date"]}\n\nПричина отколнения: {tasks_progress[task["id"]]["users"]["rejected"][callback_query.from_user.id]["reason"]}',
+                reply_markup=user_task_history_kb(place=0, category=cat, hand=False),
+                parse_mode='HTML'
+            )
+    else:
+        await callback_query.message.edit_text(
+                text='Список пуст'
+            )
 
+
+@user_dp.callback_query_handler(lambda c: 'user_task_history_last' in c.data)
+async def user_my_task_history_last(callback_query: types.CallbackQuery):
+    place = int(callback_query.data.split(':')[1])
+    cat = callback_query.data.split(':')[2]
+    tasks = await get_users_task_history_by_category(str(callback_query.from_user.id), cat)
+    if place == -1:
+        place = len(tasks) - 1
+    task = await get_task_datas(int(tasks[place]))
+    if callback_query.from_user.id in tasks_progress[task["id"]]["users"]["done"]:
+        await callback_query.message.edit_text(
+            text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task["start_date"]}',
+            reply_markup=user_task_history_kb(place=place, category=cat, hand=True),
+            parse_mode='HTML'
+        )
+    elif callback_query.from_user.id in tasks_progress[task["id"]]["users"]["rejected"]:
+        await callback_query.message.edit_text(
+            text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task["start_date"]}\n\nПричина отколнения: {tasks_progress[task["id"]]["users"]["rejected"][callback_query.from_user.id]["reason"]}',
+            reply_markup=user_task_history_kb(place=place, category=cat, hand=False),
+            parse_mode='HTML'
+        )
+
+
+@user_dp.callback_query_handler(lambda c: 'user_task_history_next' in c.data)
+async def user_my_task_history_next(callback_query: types.CallbackQuery):
+    place = int(callback_query.data.split(':')[1])
+    cat = callback_query.data.split(':')[2]
+    tasks = await get_users_task_history_by_category(str(callback_query.from_user.id), cat)
+    if ((len(tasks) - 1) < (place)):
+        place = 0
+    task = await get_task_datas(int(tasks[place]))
+    if callback_query.from_user.id in tasks_progress[task["id"]]["users"]["done"]:
+        await callback_query.message.edit_text(
+            text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task["start_date"]}',
+            reply_markup=user_task_history_kb(place=place, category=cat, hand=True),
+            parse_mode='HTML'
+        )
+    elif callback_query.from_user.id in tasks_progress[task["id"]]["users"]["rejected"]:
+        await callback_query.message.edit_text(
+            text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task["start_date"]}\n\nПричина отколнения: {tasks_progress[task["id"]]["users"]["rejected"][callback_query.from_user.id]["reason"]}',
+            reply_markup=user_task_history_kb(place=place, category=cat, hand=False),
+            parse_mode='HTML'
+        )
+
+
+##
 
 ## Навигация в моих активных задачах
 @user_dp.callback_query_handler(lambda c: 'my_active_tasks' in c.data)
@@ -848,11 +914,13 @@ async def user_hand_task_file_state(msg: types.Message, state: FSMContext):
 async def user_hand_task_text_state_skip(callback_query: types.CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         data['text'] = ''
+    tasks_progress[int(data['task_number'])]['users']['checking'][callback_query.from_user.id] = {
+        'text': data['text'],
+        'start_date': tasks_progress[int(data['task_number'])]['users']['in_process'][callback_query.from_user.id],
+        'end_date': datetime.datetime.now()
+    }
     if callback_query.from_user.id in tasks_progress[int(data['task_number'])]['users']['in_process']:
         del tasks_progress[int(data['task_number'])]['users']['in_process'][callback_query.from_user.id]
-    tasks_progress[int(data['task_number'])]['users']['checking'][callback_query.from_user.id] = {
-        'text': data['text']
-    }
     await state.finish()
     await callback_query.message.edit_text(
         text='Задание отправлено на проверку',
@@ -864,11 +932,13 @@ async def user_hand_task_text_state_skip(callback_query: types.CallbackQuery, st
 async def user_hand_task_text_state(msg: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['text'] = msg.text
+    tasks_progress[int(data['task_number'])]['users']['checking'][msg.from_user.id] = {
+        'text': data['text'],
+        'start_date': tasks_progress[int(data['task_number'])]['users']['in_process'][msg.from_user.id],
+        'end_date': datetime.datetime.now()
+    }
     if msg.from_user.id in tasks_progress[int(data['task_number'])]['users']['in_process']:
         del tasks_progress[int(data['task_number'])]['users']['in_process'][msg.from_user.id]
-    tasks_progress[int(data['task_number'])]['users']['checking'][msg.from_user.id] = {
-        'text': data['text']
-    }
     await state.finish()
     await msg.delete()
     callback = cached_data[str(msg.from_user.id)]
@@ -949,8 +1019,12 @@ channel_base_access = os.getenv('CHANNEL_BASE_ACCESS')
 channel_vip_access = os.getenv('CHANNEL_VIP_ACCESS')
 
 
-@user_dp.message_handler(commands='admin')
-async def admin_cmd_start(msg: types.Message):
+@user_dp.message_handler(commands='admin', state='*')
+async def admin_cmd_start(msg: types.Message, state=None):
+    if state:
+        current_state = await state.get_state()
+        if current_state is not None:  # Проверяем, находится ли пользователь в каком-либо состоянии
+            await state.finish()  # Завершаем текущее состояние
     base_access = await user_bot.get_chat_member(
             chat_id=channel_base_access,
             user_id=msg.from_user.id
@@ -1089,7 +1163,7 @@ async def admin_new_task_state_conf(callback_query: types.CallbackQuery, state: 
         'timer': data["timer"],
         'limit': data["count_people"],
         'users': {
-            'done': [],
+            'done': {},
             'checking': {},
             'in_process': {},
             'rejected': {},
@@ -1303,7 +1377,6 @@ async def admin_delete_task_conf(callback_query: types.CallbackQuery):
         callback_query.from_user.id,
         'Данные удаляются, немного подождите...'
     )
-    await delete_task(int(number_task))
     users = [] 
     for user in tasks_progress[int(number_task)]['users']['in_process']:
         users.append(user)
@@ -1312,6 +1385,33 @@ async def admin_delete_task_conf(callback_query: types.CallbackQuery):
     for user in users:
         await delete_active_task(user, int(number_task))
         await delete_history_task(user, int(number_task))
+    rejected = 0
+    cancelled = len(tasks_progress[int(number_task)]['users']['canceled'])
+    times = 0
+    done = len(tasks_progress[int(number_task)]['users']['done'])
+    for user in tasks_progress[int(number_task)]['users']['rejected']:
+        if tasks_progress[int(number_task)]['users']['rejected'][user]['reason'] != 'Лимит времени':
+            rejected += 1
+        else:
+            times += 1
+    task_datas = await get_task_datas(int(number_task))
+    await adding_archive_task(
+        number_task=task_datas["id"],
+        category=task_datas["category"],
+        full_text=task_datas["full_text"],
+        small_text=task_datas["small_text"],
+        price=task_datas["price"],
+        timer=task_datas["timer"],
+        count_people=task_datas["count_people"],
+        start_date=task_datas["start_date"],
+        end_date=datetime.datetime.now(),
+        who_created=task_datas["who_created"],
+        rejected=rejected,
+        cancelled=cancelled,
+        times=times,
+        done=done
+    )
+    await delete_task(int(number_task))
     async def send_message_to_user(user_id):
         try:
             await user_bot.send_message(
@@ -1424,11 +1524,17 @@ async def admin_checking_task_accept(callback_query: types.CallbackQuery):
     number_task = callback_query.data.split(':')[1]
     user_id = callback_query.data.split(':')[2]
     place = callback_query.data.split(':')[3]
+    tasks_progress[int(number_task)]['users']['done'][int(user_id)] = {
+        'start_date': tasks_progress[int(number_task)]['users']['checking'][int(user_id)]['start_date'],
+        'end_date': tasks_progress[int(number_task)]['users']['checking'][int(user_id)]['end_date'],
+        'admin_id': callback_query.from_user.id,
+        'admin_name': callback_query.from_user.username 
+    }
     if int(user_id) in tasks_progress[int(number_task)]['users']['checking']:
         del tasks_progress[int(number_task)]['users']['checking'][int(user_id)]
-    tasks_progress[int(number_task)]['users']['done'].append(int(user_id))
     await delete_active_task(user_id, number_task)
     await adding_new_history_task(user_id, number_task)
+    await adding_new_done_task(user_id, number_task)
     if os.path.exists(f'static/tasks/{number_task}'):
         all_items = os.listdir(f'static/tasks/{number_task}')
         files = [item for item in all_items if os.path.isfile(os.path.join(f'static/tasks/{number_task}', item))]
@@ -1484,11 +1590,15 @@ async def admin_checking_task_reject_state(msg: types.Message, state: FSMContext
         for message in admin_checking_cach[msg.from_user.id]:
             await message.delete()
         del admin_checking_cach[msg.from_user.id]
+    tasks_progress[int(data['number_task'])]['users']['rejected'][int(data["user_id"])] = {
+        'reason': data['couse'],
+        'start_date': tasks_progress[int(data["number_task"])]['users']['checking'][int(data['user_id'])]['start_date'],
+        'end_date': tasks_progress[int(data["number_task"])]['users']['checking'][int(data['user_id'])]['end_date'],
+        'admin_id': msg.from_user.id,
+        'admin_name': msg.from_user.username 
+    }
     if int(data["user_id"]) in tasks_progress[int(data["number_task"])]['users']['checking']:
         del tasks_progress[int(data["number_task"])]['users']['checking'][int(data['user_id'])]
-    tasks_progress[int(data['number_task'])]['users']['rejected'][int(data["user_id"])] = {
-        'reason': data['couse']
-    }
     await delete_active_task(user_id=data['user_id'], task_number=data['number_task'])
     await adding_new_history_task(data['user_id'], data['number_task'])
     await user_bot.send_message(
@@ -1499,13 +1609,116 @@ async def admin_checking_task_reject_state(msg: types.Message, state: FSMContext
     await state.finish()
     await admin_checking_task(msg, number_task=data['number_task'], place=int(data['place'])-1)
 
+##
+
+#######
+
+####### Архив
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_archeve_task')
+async def admin_all_task_archive(callback_query: types.CallbackQuery):
+    base_access = await user_bot.get_chat_member(
+            chat_id=channel_base_access,
+            user_id=callback_query.from_user.id
+            )
+    if base_access.status != 'left':
+        await AdminSearchArchiveTask.number_task.set()
+        await user_bot.send_message(
+            callback_query.from_user.id,
+            'Выберите или введите номер задания',
+            reply_markup=await admin_all_archive_tasks_kb(page=0)
+        )    
+
+@user_dp.callback_query_handler(lambda c: 'admin_all_archive_tasks_last' in c.data, state=AdminSearchArchiveTask.number_task)
+async def admin_all_task_archive_last(callback_query: types.CallbackQuery):
+    page = int(callback_query.data.split(':')[1])
+    tasks = await get_all_archive_tasks()
+    if page == -1:
+        page = (len(tasks) // 7 + 1) - 1
+    await callback_query.message.edit_text(
+        text='Выберите или введите номер задания',
+        reply_markup=await admin_all_archive_tasks_kb(page=page)
+    )    
+    return
+
+
+@user_dp.callback_query_handler(lambda c: 'admin_all_archive_tasks_next' in c.data, state=AdminSearchArchiveTask.number_task)
+async def admin_all_task_archive_next(callback_query: types.CallbackQuery):
+    page = int(callback_query.data.split(':')[1])
+    tasks = await get_all_archive_tasks()
+    if ((len(tasks) // 7 + 1) <= (page)):
+        page = 0
+    await callback_query.message.edit_text(
+        text='Выберите или введите номер задания',
+        reply_markup=await admin_all_archive_tasks_kb(page=page)
+    )    
+    return
+
+@user_dp.message_handler(state=AdminSearchArchiveTask.number_task)
+async def admin_all_task_archive_state(msg: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["number_task"] = msg.text
+    await state.finish()
+    await admin_all_task_archive_full(msg, data['number_task'])
+
+@user_dp.callback_query_handler(lambda c: 'admin_all_archive_tasks' in c.data, state=AdminSearchArchiveTask.number_task)
+async def admin_all_task_archive_button(callback_query: types.CallbackQuery, state: FSMContext):
+    number_task = callback_query.data.split(':')[1]
+    await state.finish()
+    await admin_all_task_archive_full(callback_query, number_task)
+
+
+async def admin_all_task_archive_full(msg: types.Message, number_task):
+    task = await get_archive_task_datas(number_task=int(number_task))
+    if task:
+        await user_bot.send_message(
+            msg.from_user.id,
+            text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["number_task"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task["start_date"]}',
+            parse_mode='HTML'
+        )
+        await user_bot.send_message(
+            msg.from_user.id,
+            text=f'Дата создания: {task["start_date"]}\nДата окончания: {task["end_date"]}\nОтклонено куратором: {task["rejected"]}\nОтменено: {task["cancelled"]}\nНе уложились по времени: {task["times"]}',
+            reply_markup=admin_all_task_archive_full_kb(number_task)
+        )
     
 
+@user_dp.callback_query_handler(lambda c: c.data == 'all_task_archive_full_back')
+async def get_archive_task_datas_back(callback_query: types.CallbackQuery):
+    await admin_all_task_archive(callback_query)
 
 
 
-    
-
+@user_dp.callback_query_handler(lambda c: 'list_of_done' in c.data)
+async def get_archive_task_users(callback_query: types.CallbackQuery):
+    number_task = callback_query.data.split(':')[1]
+    users = await get_done_task_users(number_task)
+    if users:
+        workbook = openpyxl.Workbook()
+        
+        # Выбираем активный лист
+        sheet = workbook.active
+        
+        # Заголовки столбцов
+        sheet['A1'] = 'ID'
+        sheet['B1'] = 'Name'
+        
+        # Заполняем столбцы ID и Name
+        for index, (user_id, name) in enumerate(users, start=2):
+            sheet.cell(row=index, column=1, value=user_id)
+            sheet.cell(row=index, column=2, value=name)
+        
+        # Сохраняем файл
+        workbook.save('utils/id_names.xlsx')
+        await user_bot.send_document(
+            callback_query.from_user.id,
+            document=open('utils/id_names.xlsx', 'rb')
+        )
+    else:
+        await user_bot.send_message(
+            callback_query.from_user.id,
+            'Похоже никто не выполнил это задание'
+        )
 
 
     

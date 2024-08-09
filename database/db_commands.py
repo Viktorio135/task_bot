@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from asgiref.sync import sync_to_async
 import datetime
-from .models import User, engine, Category, Task, TaskHistory
+from .models import User, engine, Category, Task, TaskHistory, ArchiveTasks
 
 
 
@@ -55,6 +56,17 @@ def adding_new_activa_task(user_id, task_number):
         with Session(autoflush=False, bind=engine) as session:
             obj = session.query(TaskHistory).filter(TaskHistory.user_id == user_id).first()
             obj.active_tasks += f'{task_number} '
+            session.commit()
+            return 1
+    except:
+        return 0
+
+@sync_to_async
+def adding_new_done_task(user_id, task_number):
+    try:
+        with Session(autoflush=False, bind=engine) as session:
+            obj = session.query(TaskHistory).filter(TaskHistory.user_id == user_id).first()
+            obj.done_tasks += f'{task_number} '
             session.commit()
             return 1
     except:
@@ -139,6 +151,8 @@ def get_user_data(user_id):
             return data
     except:
         return 0
+
+
 
 @sync_to_async
 def adding_balance(user_id, reward):
@@ -271,18 +285,41 @@ def get_task_datas(id):
             'timer': task.timer,
             'count_people': task.count_people,
             'start_date': task.start_date,
-            'end_date': task.end_date,
-            'status': task.status,
             'who_created': task.who_created,
         }
         return data
     
+@sync_to_async
+def get_archive_task_datas(number_task):
+    with Session(autoflush=False, bind=engine) as session:
+        task = session.query(ArchiveTasks).filter(ArchiveTasks.number_task == number_task).first()
+        if task is None:
+            return 0
+        data = {
+            'number_task': task.number_task,
+            'category': task.category,
+            'full_text': task.full_text,
+            'small_text': task.small_text,
+            'price': task.price,
+            'timer': task.timer,
+            'count_people': task.count_people,
+            'start_date': task.start_date,
+            'end_date': task.end_date,
+            'who_created': task.who_created,
+            'rejected': task.rejected,
+            'cancelled': task.cancelled,
+            'times': task.times,
+            'done': task.done
+        }
+        return data
+
 
 @sync_to_async
 def delete_task(id):
     with Session(autoflush=False, bind=engine) as session:
         session.query(Task).filter(Task.id == id).delete()
         session.commit()
+
         
 
 @sync_to_async
@@ -293,10 +330,37 @@ def edit_task_text(id, text):
         session.commit()
 
 
+
+async def get_done_task_users(number_task):
+    with Session(autoflush=False, bind=engine) as session:
+        sp = []
+        users = session.query(TaskHistory).filter(
+            or_(
+                TaskHistory.done_tasks == number_task,  # Если `done_tasks` состоит только из этого числа
+                TaskHistory.done_tasks.like(f'{number_task} %'),  # Если `done_tasks` начинается с этого числа
+                TaskHistory.done_tasks.like(f'% {number_task} %'),  # Если `done_tasks` содержит это число в середине
+                TaskHistory.done_tasks.like(f'% {number_task}')  # Если `done_tasks` заканчивается на это число
+            )
+        ).all()
+        if users:
+            for user in users:
+                username = await get_user_data(user.user_id)
+                sp.append((user.user_id, username["user_name"]))
+            return sp
+        else:
+            return 0
+
+
 @sync_to_async
 def get_all_tasks():
     with Session(autoflush=False, bind=engine) as session:
         tasks = session.query(Task).all()
+        return tasks
+    
+@sync_to_async
+def get_all_archive_tasks():
+    with Session(autoflush=False, bind=engine) as session:
+        tasks = session.query(ArchiveTasks).all()
         return tasks
 
 @sync_to_async
@@ -363,7 +427,7 @@ def get_users_task_active_by_category(user_id, category, task_progress):
         return tasks
     
 @sync_to_async
-def get_users_task_history_by_category(user_id, category, task_progress):
+def get_users_task_history_by_category(user_id, category):
     with Session(autoflush=False, bind=engine) as session:
         tasks_in_process = session.query(TaskHistory).filter(TaskHistory.user_id == user_id).first()
         tasks_in_process = tasks_in_process.history_tasks.split(' ')
@@ -389,5 +453,43 @@ def is_time_remaining(start_time, duration_minutes):
             return 0
     else:
         return 'Бессрочно'
+    
 
+
+@sync_to_async
+def adding_archive_task(
+    number_task,
+    category,
+    full_text,
+    small_text,
+    price,
+    timer,
+    count_people,
+    start_date,
+    end_date,
+    who_created,
+    rejected,
+    cancelled,
+    times,
+    done
+):
+    with Session(autoflush=False, bind=engine) as session:
+        new_task = ArchiveTasks(
+            number_task=number_task,
+            category=category,
+            full_text=full_text,
+            small_text=small_text,
+            price=price,
+            timer=timer,
+            count_people=count_people,
+            start_date=start_date,
+            end_date=end_date,
+            who_created=who_created,
+            rejected=rejected,
+            cancelled=cancelled,
+            times=times,
+            done=done
+        )
+        session.add(new_task)
+        session.commit()
 

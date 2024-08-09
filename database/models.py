@@ -8,7 +8,7 @@ from sqlalchemy import (
     Text, 
     ForeignKey,
     DateTime,
-    create_engine
+    create_engine,
 )
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -63,8 +63,6 @@ class Task(Base):
     timer = Column(String(10))
     count_people = Column(String(10))
     start_date = Column(DateTime)
-    end_date = Column(DateTime, default=None)
-    status = Column(String(100), default='active')
     who_created = Column(String(100))
 
 class TaskHistory(Base):
@@ -72,9 +70,27 @@ class TaskHistory(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(String(100))
-    active_tasks = Column(String(1000), default='')
-    history_tasks = Column(String(5000), default='')
-    in_process = Column(String(1000), default='')
+    active_tasks = Column(Text(5000), default='')
+    history_tasks = Column(Text(10000), default='')
+    done_tasks = Column(Text(10000), default='')
+
+class ArchiveTasks(Base):
+    __tablename__ = 'ArchiveTasks'
+    id = Column(Integer, primary_key=True)
+    number_task = Column(Integer)
+    category = Column(String(100))
+    full_text = Column(Text(5000))
+    small_text = Column(String(1000))
+    price = Column(String(10))
+    timer = Column(String(10))
+    count_people = Column(String(10))
+    start_date = Column(DateTime)
+    end_date = Column(DateTime)
+    who_created = Column(String(100))
+    rejected = Column(Integer)
+    cancelled = Column(Integer)
+    times = Column(Integer)
+    done = Column(Integer)
 
 
 def start_db():

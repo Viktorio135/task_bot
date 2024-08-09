@@ -42,7 +42,7 @@ def new_task_cancel():
 
 def admin_all_task_kb():
     btn1 = InlineKeyboardButton(text='Активные', callback_data='active_admin_task')
-    btn2 = InlineKeyboardButton(text='Архив', callback_data='archevi_admin_task')
+    btn2 = InlineKeyboardButton(text='Архив', callback_data='admin_archeve_task')
     keybaord = InlineKeyboardMarkup().add(btn1, btn2)
     return keybaord
 
@@ -68,6 +68,35 @@ async def admin_all_active_tasks_kb(page, cached_data):
     keyboard.add(btn1, btn2)
 
     return keyboard
+
+
+async def admin_all_archive_tasks_kb(page):
+    tasks = await get_all_archive_tasks()
+    total_pages = len(tasks) // 7 + 1
+    keyboard = InlineKeyboardMarkup()
+
+    start_idx = page * 7
+    end_idx = start_idx + 7
+    current_tasks = tasks[start_idx:end_idx]
+
+    for task in current_tasks:
+        task_datas = await get_archive_task_datas(int(task.number_task))
+        done = task_datas["done"]
+        limit = task_datas["count_people"]
+        if int(done) == int(limit):
+            btn = InlineKeyboardButton(text=f'✅ Задание #{task.number_task} {done}/{limit}', callback_data=f'admin_all_archive_tasks:{task.number_task}')
+            keyboard.add(btn)
+        else:
+            btn = InlineKeyboardButton(text=f'❌ Задание #{task.number_task} {done}/{limit}', callback_data=f'admin_all_archive_tasks:{task.number_task}')
+            keyboard.add(btn)
+    btn1 = InlineKeyboardButton(text='<', callback_data=f'admin_all_archive_tasks_last:{page-1}')
+    btn2 = InlineKeyboardButton(text='>', callback_data=f'admin_all_archive_tasks_next:{page+1}')
+    keyboard.add(btn1, btn2)
+
+    return keyboard
+
+
+
 
 
 def admin_show_full_task_kb(number_task):
@@ -103,4 +132,10 @@ def admin_checking_kb(number_task, user_id, place=0):
 def admin_reject_task_kb():
     btn1 = InlineKeyboardButton(text='<<', callback_data='admin_reject_task_cancel')
     keyboard = InlineKeyboardMarkup().add(btn1)
+    return keyboard
+
+def admin_all_task_archive_full_kb(number_task):
+    btn1 = InlineKeyboardButton(text='Список выполнивших', callback_data=f'list_of_done:{number_task}')
+    btn2 = InlineKeyboardButton(text='<<', callback_data='all_task_archive_full_back')
+    keyboard = InlineKeyboardMarkup().add(btn1).add(btn2)
     return keyboard

@@ -237,3 +237,18 @@ def user_edit_text_kb():
     keyboard = InlineKeyboardMarkup().add(btn1)
     return keyboard
 
+
+
+def user_task_history_kb(place, category, hand=False):
+    keyboard = InlineKeyboardMarkup()
+    if hand:
+        btn = InlineKeyboardButton('✅ Засчитано', callback_data='nothing')
+        keyboard.add(btn)
+    else:
+        btn = InlineKeyboardButton(text='❌ Не зачитано', callback_data='nothing')
+        keyboard.add(btn)
+    btn2 = InlineKeyboardButton(text='<', callback_data=f'user_task_history_last:{place-1}:{category}')
+    btn3 = InlineKeyboardButton(text='>', callback_data=f'user_task_history_next:{place+1}:{category}')
+    btn4 = InlineKeyboardButton(text='<<', callback_data='back_tasks')
+    keyboard.add(btn2, btn3).add(btn4)
+    return keyboard

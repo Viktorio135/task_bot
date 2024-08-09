@@ -14,6 +14,9 @@ class AdminNewCategory(StatesGroup):
 class AdminSearchTask(StatesGroup):
     number_task = State()
 
+class AdminSearchArchiveTask(StatesGroup):
+    number_task = State()
+
 class AdminEditText(StatesGroup):
     number_task = State()
     text = State()
