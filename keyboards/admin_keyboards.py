@@ -139,3 +139,30 @@ def admin_all_task_archive_full_kb(number_task):
     btn2 = InlineKeyboardButton(text='<<', callback_data='all_task_archive_full_back')
     keyboard = InlineKeyboardMarkup().add(btn1).add(btn2)
     return keyboard
+
+def admin_users_kb(user_id):
+    btn1 = InlineKeyboardButton(text='Предупреждения', callback_data=f'admin_user_warning:{user_id}')
+    btn2 = InlineKeyboardButton(text='Выдать баланс', callback_data=f'admin_user_adding_balance:{user_id}')
+    btn3 = InlineKeyboardButton(text='Вычесть баланс', callback_data=f'admin_user_subtract_balance:{user_id}')
+    btn4 = InlineKeyboardButton(text='Задания', callback_data=f'admin_show_user_tasks:{user_id}')
+    btn5 = InlineKeyboardButton(text='<<', callback_data='admin_back_user')
+    keyboard = InlineKeyboardMarkup().add(btn1, btn2).add(btn3, btn4).add(btn5)
+    return keyboard
+
+def admin_users_warnings_kb(user_id):
+    btn1 = InlineKeyboardButton(text='Предупреждение', callback_data=f'admin_adding_warning:{user_id}')
+    btn2 = InlineKeyboardButton(text='Блокировка', callback_data=f'admin_block_user:{user_id}')
+    keyboard = InlineKeyboardMarkup().add(btn1, btn2)
+    return keyboard
+
+def admin_ublock_user_conf(user_id):
+    btn1 = InlineKeyboardButton(text='Уверен', callback_data=f'admin_conf_block_user:{user_id}')
+    btn2 = InlineKeyboardButton(text='Отмена', callback_data=f'admin_conf_calcel_block')
+    keyboard = InlineKeyboardMarkup().add(btn1, btn2)
+    return keyboard
+
+def admin_show_user_task_kb(user_id):
+    btn1 = InlineKeyboardButton(text='Зачесть выполнение', callback_data=f'admin_give_done_task:{user_id}')
+    btn2 = InlineKeyboardButton(text='Все задания', callback_data=f'admin_show_all_user_task:{user_id}')
+    keyborad = InlineKeyboardMarkup().add(btn1, btn2)
+    return keyborad

@@ -27,3 +27,22 @@ class AdminRejectTask(StatesGroup):
     user_id = State()
     number_task = State()
     couse = State()
+
+class AdminSearchUser(StatesGroup):
+    user_id = State()
+
+class AdminAddingWarning(StatesGroup):
+    user_id = State()
+    text = State()
+
+class AdminAddingBalance(StatesGroup):
+    user_id = State()
+    balance = State()
+
+class AdminSubtractBalance(StatesGroup):
+    user_id = State()
+    balance = State()
+
+class AdminGiveTask(StatesGroup):
+    user_id = State()
+    number_task = State()

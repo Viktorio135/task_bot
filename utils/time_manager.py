@@ -1,4 +1,4 @@
-from database.db_commands import is_time_remaining, delete_active_task
+from database.db_commands import is_time_remaining, delete_active_task, adding_user_times, subtract_user_in_process
 
 
 
@@ -15,3 +15,5 @@ async def time_manage(tasks_progress):
                     }
                     del tasks_progress[task]['users']['in_process'][user]
                     await delete_active_task(str(user), str(task))
+                    await subtract_user_in_process(str(user))
+                    await adding_user_times(str(user))

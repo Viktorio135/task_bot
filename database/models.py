@@ -43,6 +43,12 @@ class User(Base):
     youtube = Column(String(200), default='')
     is_admin = Column(Boolean, default=False)
     is_block = Column(Boolean, default=False)
+    in_process = Column(Integer, default=0)
+    done = Column(Integer, default=0)
+    cancelled = Column(Integer, default=0)
+    rejected = Column(Integer, default=0)
+    times = Column(Integer, default=0)
+    warnings = Column(Integer, default=0)
 
 
 class Category(Base):
@@ -91,6 +97,8 @@ class ArchiveTasks(Base):
     cancelled = Column(Integer)
     times = Column(Integer)
     done = Column(Integer)
+
+
 
 
 def start_db():

@@ -49,6 +49,15 @@ def get_users_active_tasks(user_id, active_tasks):
         return 0
 
 
+@sync_to_async
+def block_user(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.is_block = True
+        session.commit()
+
+
+
 
 @sync_to_async 
 def adding_new_activa_task(user_id, task_number):
@@ -60,6 +69,19 @@ def adding_new_activa_task(user_id, task_number):
             return 1
     except:
         return 0
+
+def get_list_of_blocks():
+    with Session(autoflush=False, bind=engine) as session:
+        block_users = set()
+        obj = session.query(User).filter(User.is_block == True).all()
+        if obj:
+            for user in obj:
+                block_users.add(int(user.user_id))
+            return block_users
+        else:
+            return block_users
+
+
 
 @sync_to_async
 def adding_new_done_task(user_id, task_number):
@@ -136,6 +158,8 @@ def get_user_data(user_id):
     try:
         with Session(autoflush=False, bind=engine) as session:
             obj = session.query(User).filter(User.user_id == user_id).first()
+            if not(obj):
+                return 0
             data = {
                 "user_name": obj.user_name,
                 "user_id": obj.user_id,
@@ -147,12 +171,106 @@ def get_user_data(user_id):
                 "phone_number": obj.phone_number,
                 "notifications": obj.notifications,
                 "youtube": obj.youtube,
+                "in_process": obj.in_process,
+                "done": obj.done,
+                "cancelled": obj.cancelled,
+                "rejected": obj.rejected,
+                "times": obj.times
             }
             return data
     except:
         return 0
 
+@sync_to_async
+def get_user_data_by_username(username):
+    try:
+        with Session(autoflush=False, bind=engine) as session:
+            obj = session.query(User).filter(User.user_name == username).first()
+            if not(obj):
+                return 0
+            data = {
+                "user_name": obj.user_name,
+                "user_id": obj.user_id,
+                "ref_invitees": obj.ref_invitees,
+                "balance": obj.balance,
+                "type_bank": obj.type_bank,
+                "card_number": obj.card_number,
+                "bank_name": obj.bank_name,
+                "phone_number": obj.phone_number,
+                "notifications": obj.notifications,
+                "youtube": obj.youtube,
+                "in_process": obj.in_process,
+                "done": obj.done,
+                "cancelled": obj.cancelled,
+                "rejected": obj.rejected,
+                "times": obj.times
+            }
+            return data
+    except:
+        return 0
 
+@sync_to_async
+def adding_user_in_process(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.in_process = obj.in_process + 1
+        session.commit()
+
+@sync_to_async
+def adding_user_times(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.times = obj.times + 1
+        session.commit()
+
+@sync_to_async
+def adding_user_done(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.done = obj.done + 1
+        session.commit()
+
+@sync_to_async
+def adding_user_cancelled(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.cancelled = obj.cancelled + 1
+        session.commit()
+
+@sync_to_async
+def adding_user_rejected(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.rejected = obj.rejected + 1
+        session.commit()
+
+@sync_to_async
+def adding_user_warnings(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.warnings = obj.warnings + 1
+        session.commit()
+
+@sync_to_async
+def subtract_user_in_process(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.in_process = obj.in_process - 1
+        session.commit()
+
+@sync_to_async
+def subtract_user_cancelled(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.cancelled = obj.cancelled - 1
+        session.commit()
+
+@sync_to_async
+def subtract_user_cancelled(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.rejected = obj.rejected - 1
+        session.commit()
 
 @sync_to_async
 def adding_balance(user_id, reward):
@@ -161,6 +279,12 @@ def adding_balance(user_id, reward):
         obj.balance = obj.balance + int(reward)
         session.commit()
 
+@sync_to_async
+def subtract_balance(user_id, reward):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        obj.balance = obj.balance - int(reward)
+        session.commit()
 
 @sync_to_async
 def has_register(user_id):
@@ -275,7 +399,21 @@ def get_task_datas(id):
     with Session(autoflush=False, bind=engine) as session:
         task = session.query(Task).filter(Task.id == id).first()
         if task is None:
-            return 0
+            task = session.query(ArchiveTasks).filter(ArchiveTasks.number_task == id).first()
+            if task is None:
+                return 0
+            data = {
+                'id': task.number_task,
+                'category': task.category,
+                'full_text': task.full_text + '\n\nЗадание перенесено в архив',
+                'small_text': task.small_text,
+                'price': task.price,
+                'timer': task.timer,
+                'count_people': task.count_people,
+                'start_date': task.start_date,
+                'who_created': task.who_created,
+            }
+            return data
         data = {
             'id': task.id,
             'category': task.category,
@@ -362,6 +500,18 @@ def get_all_archive_tasks():
     with Session(autoflush=False, bind=engine) as session:
         tasks = session.query(ArchiveTasks).all()
         return tasks
+    
+@sync_to_async
+def get_all_archive_tasks_list():
+    with Session(autoflush=False, bind=engine) as session:
+        tasks = session.query(ArchiveTasks).all()
+        if not tasks:
+            return []
+        sp = []
+        for task in tasks:
+            sp.append(task.number_task)
+        return sp
+        
 
 @sync_to_async
 def get_all_task_in_category(category):
@@ -392,13 +542,15 @@ def get_user_category(user_id):
             for num in history_tasks:
                 if num != '':
                     task = session.query(Task).filter(Task.id == int(num)).first()
+                    if not task:
+                        task = session.query(ArchiveTasks).filter(ArchiveTasks.number_task == int(num)).first()
                     categories.append(task.category)
-        in_process = user_history.history_tasks.split(' ')
-        if len(in_process) != 0 and in_process != ['']:
-            for num in in_process:
-                if num != '':
-                    task = session.query(Task).filter(Task.id == int(num)).first()
-                    categories.append(task.category)
+        # in_process = user_history..split(' ')
+        # if len(in_process) != 0 and in_process != ['']:
+        #     for num in in_process:
+        #         if num != '':
+        #             task = session.query(Task).filter(Task.id == int(num)).first()
+        #             categories.append(task.category)
 
         if ' ' in categories:
             categories.remove(' ')
@@ -435,7 +587,11 @@ def get_users_task_history_by_category(user_id, category):
         for task in tasks_in_process:
             if task != '':
                 obj = session.query(Task).filter(Task.id == int(task)).first()
-                if obj.category == category:
+                if not obj:
+                    obj = session.query(ArchiveTasks).filter(ArchiveTasks.number_task == int(task)).first()
+                    if obj.category == category:
+                        tasks.append(obj.number_task)
+                else:
                     tasks.append(obj.id)
         return tasks
 
@@ -493,3 +649,29 @@ def adding_archive_task(
         session.add(new_task)
         session.commit()
 
+@sync_to_async
+def get_all_active_tasks(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(TaskHistory).filter(TaskHistory.user_id == str(user_id)).first()
+        if obj:
+            return obj.active_tasks
+        else:
+            return 0
+        
+@sync_to_async
+def get_all_history_tasks(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(TaskHistory).filter(TaskHistory.user_id == str(user_id)).first()
+        if obj:
+            return obj.history_tasks
+        else:
+            return 0
+    
+@sync_to_async
+def get_all_done_tasks(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(TaskHistory).filter(TaskHistory.user_id == str(user_id)).first()
+        if obj:
+            return obj.done_tasks
+        else:
+            return 0
