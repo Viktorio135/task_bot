@@ -98,6 +98,23 @@ class ArchiveTasks(Base):
     times = Column(Integer)
     done = Column(Integer)
 
+class Statistic(Base):
+    __tablename__ = 'statistic'
+    id = Column(Integer, primary_key=True)
+    paid = Column(Integer, default=0)
+    count_tasks = Column(Integer, default=0)
+    delete_tasks = Column(Integer, default=0)
+    accepted = Column(Integer, default=0)
+    rejected = Column(Integer, default=0)
+
+class Transactions(Base):
+    __tablename__ = 'transactions'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(100))
+    user_name = Column(String(100))
+    amount = Column(Integer)
+    date = Column(DateTime)
+
 
 
 

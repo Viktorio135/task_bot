@@ -46,3 +46,8 @@ class AdminSubtractBalance(StatesGroup):
 class AdminGiveTask(StatesGroup):
     user_id = State()
     number_task = State()
+
+class AdminSearchUserTask(StatesGroup):
+    user_id = State()
+    number_task = State()
+    

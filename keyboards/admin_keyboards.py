@@ -95,6 +95,96 @@ async def admin_all_archive_tasks_kb(page):
 
     return keyboard
 
+async def admin_show_all_user_task_kb(page, user_id, tasks_progerss, archive_task_progress):
+    done_tasks = []
+    in_process_tasks = []
+    rejected_tasks = []
+    checking = []
+    for task in tasks_progerss:
+        if int(user_id) in tasks_progerss[task]['users']['done']:
+            done_tasks.append(task)
+    for task in archive_task_progress:
+        if int(user_id) in archive_task_progress[task]['users']['done']:
+            done_tasks.append(task)
+    for task in tasks_progerss:
+        if int(user_id) in tasks_progerss[task]['users']['in_process']:
+            in_process_tasks.append(task)
+    for task in tasks_progerss:
+        if int(user_id) in tasks_progerss[task]['users']['rejected']:
+            rejected_tasks.append(task)
+    for task in archive_task_progress:
+        if int(user_id) in archive_task_progress[task]['users']['rejected']:
+            rejected_tasks.append(task)
+    for task in tasks_progerss:
+        if int(user_id) in tasks_progerss[task]['users']['checking']:
+            checking.append(task)
+    tasks = done_tasks + in_process_tasks + rejected_tasks + checking
+    if ((len(tasks) // 7 + 1) <= (page)):
+        page = 0
+    if page == -1:
+        page = (len(tasks) // 7 + 1) - 1
+    total_pages = len(tasks) // 7 + 1
+    keyboard = InlineKeyboardMarkup()
+
+    start_idx = page * 7
+    end_idx = start_idx + 7
+    current_tasks = tasks[start_idx:end_idx]
+
+    for task in current_tasks:
+        task_datas = await get_task_datas(int(task))
+        limit = task_datas["count_people"]
+        flag_archive = 'Задание перенесено в архив' in task_datas["full_text"]
+        if task in done_tasks:
+            if task in tasks_progerss:
+                done = len(tasks_progerss[task]['users']['done'])
+            else:
+                done = len(archive_task_progress[task]['users']['done'])
+            btn = InlineKeyboardButton(text=f'✅ Задание #{task} - {done}/{limit} {" - архив" if flag_archive else ""}', callback_data=f'admin_show_all_user_task:{user_id}:{task}')
+            keyboard.add(btn)
+        elif task in checking:
+            done = len(tasks_progerss[task]['users']['done'])
+            btn = InlineKeyboardButton(text=f'📝 Задание #{task} - {done}/{limit}', callback_data=f'nothing')
+            keyboard.add(btn)
+        elif task in in_process_tasks:
+            done = len(tasks_progerss[task]['users']['done'])
+            btn = InlineKeyboardButton(text=f'Задание #{task} - {done}/{limit}', callback_data=f'nothing')
+            keyboard.add(btn)
+        elif task in rejected_tasks:
+            if task in tasks_progerss:
+                flag_active = int(user_id) in tasks_progerss[task]['users']['rejected']
+            else:
+                flag_active = False
+            if task in archive_task_progress:
+                flag_archive = int(user_id) in archive_task_progress[task]['users']['rejected']
+            else:
+                flag_archive = False
+            if flag_active:
+                done = len(tasks_progerss[task]['users']['done'])
+                if tasks_progerss[task]['users']['rejected'][int(user_id)]['reason'] == 'Лимит времени':
+                    btn = InlineKeyboardButton(text=f'⏱️ Задание #{task} - {done}/{limit} {"- архив" if flag_archive else ""}', callback_data=f'nothing')
+                    keyboard.add(btn)
+                else:
+                    btn = InlineKeyboardButton(text=f'❌ Задание #{task} - {done}/{limit} {"- архив" if flag_archive else ""}', callback_data=f'admin_show_all_user_task:{user_id}:{task}')
+                    keyboard.add(btn)
+            elif flag_archive:
+                done = len(archive_task_progress[task]['users']['done'])
+                if archive_task_progress[task]['users']['rejected'][int(user_id)]['reason'] == 'Лимит времени':
+                    btn = InlineKeyboardButton(text=f'⏱️ Задание #{task} - {done}/{limit} {"- архив" if flag_archive else ""}', callback_data=f'nothing')
+                    keyboard.add(btn)
+                else:
+                    btn = InlineKeyboardButton(text=f'❌ Задание #{task} - {done}/{limit} {"- архив" if flag_archive else ""}', callback_data=f'admin_show_all_user_task:{user_id}:{task}')
+                    keyboard.add(btn)
+
+
+    btn1 = InlineKeyboardButton(text='<', callback_data=f'admin_show_last_all_user_task:{page-1}:{user_id}')
+    btn2 = InlineKeyboardButton(text='>', callback_data=f'admin_show_next_all_user_task:{page+1}:{user_id}')
+    keyboard.add(btn1, btn2)
+
+    return keyboard
+
+
+
+
 
 
 
@@ -166,3 +256,23 @@ def admin_show_user_task_kb(user_id):
     btn2 = InlineKeyboardButton(text='Все задания', callback_data=f'admin_show_all_user_task:{user_id}')
     keyborad = InlineKeyboardMarkup().add(btn1, btn2)
     return keyborad
+
+def admin_user_stat_kb():
+    btn1 = InlineKeyboardButton(text='Выплаты', callback_data='admip_paid')
+    btn2 = InlineKeyboardButton(text='Рефералы', callback_data='admin_ref')
+    btn3 = InlineKeyboardButton(text='Топ активности', callback_data='admin_top')
+    btn4 = InlineKeyboardButton(text='Предупреждения и блокировки', callback_data='admin_warn_and_block')
+    keyboard = InlineKeyboardMarkup().add(btn1, btn2).add(btn3).add(btn4)
+    return keyboard
+
+def admin_user_paid_kb():
+    btn1 = InlineKeyboardButton(text='Все', callback_data='all_transactions')
+    btn2 = InlineKeyboardButton(text='Актуальные', callback_data='current_transactions')
+    keyboard = InlineKeyboardMarkup().add(btn1, btn2)
+    return keyboard
+
+def admin_update_user_paid_kb():
+    btn1 = InlineKeyboardButton(text='Обнулить список', callback_data='admin_update_paid_list')
+    btn2 = InlineKeyboardButton(text='<<', callback_data='admin_back_update_paid')
+    keyboard = InlineKeyboardMarkup().add(btn1).add(btn2)
+    return keyboard

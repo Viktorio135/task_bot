@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from asgiref.sync import sync_to_async
 import datetime
-from .models import User, engine, Category, Task, TaskHistory, ArchiveTasks
+from .models import User, engine, Category, Task, TaskHistory, ArchiveTasks, Statistic, Transactions
 
 
 
@@ -22,6 +22,48 @@ def create_user(
             return 1
     except:
         return 0
+
+@sync_to_async
+def create_transaction(user_id, user_name, amount, date):
+    try:
+        with Session(autoflush=False, bind=engine) as session:
+            transaction = Transactions(
+                user_id=user_id,
+                user_name=user_name,
+                amount=amount,
+                date=date
+            )
+            session.add(transaction)
+            session.commit()
+    except:
+        pass
+
+@sync_to_async
+def get_all_transactions():
+    with Session(autoflush=False, bind=engine) as session:
+        transactions = session.query(Transactions).all()
+        if transactions:
+            ls = []
+            for tr in transactions:
+                ls.append((tr.user_id, tr.user_name, tr.amount, tr.date))
+            return ls
+        else:
+            return None
+
+
+@sync_to_async
+def get_users_for_paid():
+    with Session(autoflush=False, bind=engine) as session:
+        ls = []
+        users = session.query(User).filter(User.balance >= 200).all()
+        if users:
+            for user in users:
+                if user.type_bank != '':
+                    ls.append((user.user_id, user.user_name, user.balance, user.type_bank, user.card_number, user.bank_name, user.phone_number))
+            return ls
+        else:
+            return None
+
     
 @sync_to_async
 def create_user_history(user_id):
@@ -35,6 +77,79 @@ def create_user_history(user_id):
             return 1
     except:
         return 0
+
+def create_statistic():
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(Statistic).filter(Statistic.id == 1).first()
+        if obj:
+            pass
+        else:
+            stat = Statistic()
+            session.add(stat)
+            session.commit()
+
+@sync_to_async
+def adding_stat_paid(val):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(Statistic).filter(Statistic.id == 1).first()
+        if obj:
+            obj.paid = obj.paid + int(val)
+            session.commit()
+
+@sync_to_async
+def adding_stat_del_task():
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(Statistic).filter(Statistic.id == 1).first()
+        if obj:
+            obj.delete_tasks = obj.delete_tasks + 1
+            session.commit()
+
+@sync_to_async
+def adding_stat_accepted():
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(Statistic).filter(Statistic.id == 1).first()
+        if obj:
+            obj.accepted = obj.accepted + 1
+            session.commit()
+
+@sync_to_async
+def adding_stat_rejected():
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(Statistic).filter(Statistic.id == 1).first()
+        if obj:
+            obj.rejected = obj.rejected + 1
+            session.commit()
+
+@sync_to_async
+def adding_stat_count_tasks():
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(Statistic).filter(Statistic.id == 1).first()
+        if obj:
+            obj.count_tasks = obj.count_tasks + 1
+            session.commit()
+
+
+@sync_to_async
+def get_users_count():
+    with Session(autoflush=False, bind=engine) as session:
+        count = session.query(User).count()
+        return count
+
+@sync_to_async
+def get_stat():
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(Statistic).filter(Statistic.id == 1).first()
+        if not obj:
+            return 0
+        else:
+            data = {
+                'paid': obj.paid,
+                'count_tasks': obj.count_tasks,
+                'delete_tasks': obj.delete_tasks,
+                'accepted': obj.accepted,
+                'rejected': obj.rejected
+            }
+            return data
 
 @sync_to_async
 def get_users_active_tasks(user_id, active_tasks):

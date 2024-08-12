@@ -4,6 +4,7 @@ import random
 import datetime
 import threading
 import openpyxl
+import shutil
 import dill as pickle
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -701,7 +702,8 @@ async def user_all_tasks_in_category_back(callback_query: types.CallbackQuery, s
 @block_check
 async def user_reject_new_task(callback_query: types.CallbackQuery):
     taks_number = callback_query.data.split(':')[1]
-    tasks_progress[int(taks_number)]['users']['canceled'].append(callback_query.from_user.id)
+    if int(taks_number) in tasks_progress:
+        tasks_progress[int(taks_number)]['users']['canceled'].append(callback_query.from_user.id)
     await callback_query.message.delete()    
 
 @block_check
@@ -1290,6 +1292,9 @@ async def admin_new_task_state_conf(callback_query: types.CallbackQuery, state: 
     }
     if not(os.path.exists(f'static/tasks/{await get_last_task()}')):
         os.makedirs(f'static/tasks/{await get_last_task()}')
+    if not(os.path.exists(f'static/archive/{await get_last_task()}')):
+        os.makedirs(f'static/archive/{await get_last_task()}')
+    await adding_stat_count_tasks()
     list_of_users = await get_users_list_for_task()
     async def send_message_to_user(user_id):
         try:
@@ -1527,6 +1532,7 @@ async def admin_delete_task_conf(callback_query: types.CallbackQuery):
         done=done
     )
     await delete_task(int(number_task))
+    await adding_stat_del_task()
     async def send_message_to_user(user_id):
         try:
             await user_bot.send_message(
@@ -1543,6 +1549,7 @@ async def admin_delete_task_conf(callback_query: types.CallbackQuery):
     results = await asyncio.gather(*tasks)
     archive_tasks_progerss[int(number_task)] = tasks_progress[int(number_task)]
     del tasks_progress[int(number_task)]
+    shutil.rmtree(f'static/tasks/{number_task}')
     await message.delete()
     await user_bot.send_message(
         callback_query.from_user.id,
@@ -1637,7 +1644,6 @@ async def admin_checking_task_last(callback_query: types.CallbackQuery):
 
 
 
-
 @user_dp.callback_query_handler(lambda c: 'accept_admin__task' in c.data)
 @allow_bace_access
 async def admin_checking_task_accept(callback_query: types.CallbackQuery):
@@ -1662,9 +1668,10 @@ async def admin_checking_task_accept(callback_query: types.CallbackQuery):
         files = [item for item in all_items if os.path.isfile(os.path.join(f'static/tasks/{number_task}', item))]
         for file in files:
             if str(user_id) in file:
-                os.remove(f'static/tasks/{number_task}/{file}')
+                shutil.move(f'static/tasks/{number_task}/{file}', f'static/archive/{number_task}/{file}')
     task_datas = await get_task_datas(int(number_task))
     await adding_balance(user_id=user_id, reward=task_datas["price"])
+    await adding_stat_accepted()
     await callback_query.message.delete()
     if callback_query.from_user.id in admin_checking_cach:
         for message in admin_checking_cach[callback_query.from_user.id]:
@@ -1722,12 +1729,19 @@ async def admin_checking_task_reject_state(msg: types.Message, state: FSMContext
         'admin_id': msg.from_user.id,
         'admin_name': msg.from_user.username 
     }
+    if os.path.exists(f'static/tasks/{data["number_task"]}'):
+        all_items = os.listdir(f'static/tasks/{data["number_task"]}')
+        files = [item for item in all_items if os.path.isfile(os.path.join(f'static/tasks/{data["number_task"]}', item))]
+        for file in files:
+            if str(data["number_task"]) in file:
+                shutil.move(f'static/tasks/{data["number_task"]}/{file}', f'static/archive/{data["number_task"]}/{file}')
     if int(data["user_id"]) in tasks_progress[int(data["number_task"])]['users']['checking']:
         del tasks_progress[int(data["number_task"])]['users']['checking'][int(data['user_id'])]
     await delete_active_task(user_id=data['user_id'], task_number=data['number_task'])
     await subtract_user_in_process(data['user_id'])
     await adding_user_rejected(data['user_id'])
     await adding_new_history_task(data['user_id'], data['number_task'])
+    await adding_stat_rejected()
     await user_bot.send_message(
         int(data['user_id']),
         f'Задание #{data["number_task"]} было отклонено,\n\nПричина: {data["couse"]}',
@@ -1842,10 +1856,10 @@ async def get_archive_task_users(callback_query: types.CallbackQuery):
             sheet.cell(row=index, column=2, value=name)
         
         # Сохраняем файл
-        workbook.save('utils/id_names.xlsx')
+        workbook.save('static/excel/id_names.xlsx')
         await user_bot.send_document(
             callback_query.from_user.id,
-            document=open('utils/id_names.xlsx', 'rb')
+            document=open('static/excel/id_names.xlsx', 'rb')
         )
     else:
         await user_bot.send_message(
@@ -2061,6 +2075,8 @@ async def admin_show_user_task(callback_query: types.CallbackQuery):
         reply_markup=admin_show_user_task_kb(user_id)
     )
 
+
+# Зачесть выполнение
 @user_dp.callback_query_handler(lambda c: 'admin_give_done_task' in c.data)
 @allow_bace_access
 async def admin_give_done_task(callback_query: types.CallbackQuery, state: FSMContext):
@@ -2101,6 +2117,7 @@ async def admin_give_done_task_state(msg: types.Message, state: FSMContext):
                 'admin_name': msg.from_user.username
             }
             task_datas = await get_task_datas(int(data["number_task"]))
+            await adding_stat_accepted()
             await adding_balance(int(data["user_id"]), int(task_datas["price"]))
             if data['number_task'] in await get_all_active_tasks(data["user_id"]):
                 await delete_active_task(data["user_id"], data['number_task'])
@@ -2143,6 +2160,7 @@ async def admin_give_done_task_state(msg: types.Message, state: FSMContext):
                 await adding_new_done_task(data["user_id"], data['number_task'])
             task_datas = await get_archive_task_datas(int(data['number_task']))
             await adding_balance(int(data["user_id"]), int(task_datas["price"]))
+            await adding_stat_accepted()
             await message.delete()
             await user_bot.send_message(
                 msg.from_user.id,
@@ -2162,13 +2180,423 @@ async def admin_give_done_task_state(msg: types.Message, state: FSMContext):
             'Похоже задачи с таким номером не существует, проверьть всё еще раз!'
         )
 
+#
+
+# Все задания
+@user_dp.callback_query_handler(lambda c: 'admin_show_all_user_task' in c.data)
+@allow_bace_access
+async def admin_show_all_user_task(callback_query: types.CallbackQuery, state: FSMContext):
+    user_id = callback_query.data.split(':')[1]
+    await AdminSearchUserTask.user_id.set()
+    async with state.proxy() as data:
+        data['user_id'] = user_id
+    await AdminSearchUserTask.number_task.set()
+    message = await user_bot.send_message(
+        callback_query.from_user.id,
+        'Немного подождите, получаем статистику польлователя...'
+    )
+    done_tasks = []
+    done_tasks_with_price = []
+    for task in tasks_progress:
+        if int(user_id) in tasks_progress[task]['users']['done']:
+            done_tasks.append(task)
+    for task in archive_tasks_progerss:
+        if int(user_id) in archive_tasks_progerss[task]['users']['done']:
+            done_tasks.append(task) 
+    if len(done_tasks) != 0:
+        for task in done_tasks:
+            task_datas = await get_task_datas(int(task))
+            if task_datas:
+                done_tasks_with_price.append((task, task_datas["price"]))
+        workbook = openpyxl.Workbook()
+        
+        # Выбираем активный лист
+        sheet = workbook.active
+        
+        # Заголовки столбцов
+        sheet['A1'] = 'Задание'
+        sheet['B1'] = 'Цена'
+
+        for index, (user_id, name) in enumerate(done_tasks_with_price, start=2):
+            sheet.cell(row=index, column=1, value=user_id)
+            sheet.cell(row=index, column=2, value=name)
+        
+        # Сохраняем файл
+        workbook.save(f'static/excel/{data["user_id"]}.xlsx')
+        await user_bot.send_document(
+            callback_query.from_user.id,
+            document=open(f'static/excel/{data["user_id"]}.xlsx', 'rb')
+        )
+        
+
+    await user_bot.send_message(
+        callback_query.from_user.id,
+        'Выберите или введите номер задания',
+        reply_markup=await admin_show_all_user_task_kb(page=0, user_id=data['user_id'], tasks_progerss=tasks_progress, archive_task_progress=archive_tasks_progerss)
+    )
+    await message.delete()
+
+@user_dp.callback_query_handler(lambda c: 'admin_show_last_all_user_task' in c.data, state=AdminSearchUserTask.number_task)
+@allow_bace_access
+async def admin_show_last_all_user_task_last(callback_query: types.CallbackQuery, state: FSMContext):
+    page = int(callback_query.data.split(':')[1])
+    user_id = int(callback_query.data.split(':')[2])
+    await callback_query.message.edit_text(
+        text='Выберите или введите номер задания',
+        reply_markup=await admin_show_all_user_task_kb(page=page, user_id=user_id, tasks_progerss=tasks_progress, archive_task_progress=archive_tasks_progerss)
+    )
+    return
+
+@user_dp.callback_query_handler(lambda c: 'admin_show_next_all_user_task' in c.data, state=AdminSearchUserTask.number_task)
+@allow_bace_access
+async def admin_show_next_all_user_task_last(callback_query: types.CallbackQuery, state: FSMContext):
+    page = int(callback_query.data.split(':')[1])
+    user_id = int(callback_query.data.split(':')[2])
+    await callback_query.message.edit_text(
+        text='Выберите или введите номер задания',
+        reply_markup=await admin_show_all_user_task_kb(page=page, user_id=user_id, tasks_progerss=tasks_progress, archive_task_progress=archive_tasks_progerss)
+    )
+    return
+
+@user_dp.callback_query_handler(lambda c: 'admin_show_all_user_task' in c.data, state=AdminSearchUserTask.number_task)
+@allow_bace_access
+async def admin_show_all_user_task_state(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.finish()
+    user_id = int(callback_query.data.split(':')[1])
+    number_task = callback_query.data.split(':')[2]
+    await admin_show_all_user_task(callback_query, user_id, number_task)
+
+@user_dp.message_handler(state=AdminSearchUserTask.number_task)
+@allow_bace_access
+async def admin_show_all_user_task_state_step(msg: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["number_task"] = msg.text
+    await state.finish()
+    await admin_show_all_user_task(msg, data["user_id"], data['number_task'])
 
 
-            
-    
+
+@allow_bace_access
+async def admin_show_all_user_task(msg: types.Message, user_id, number_task):
+    message = await user_bot.send_message(
+        msg.from_user.id,
+        'Немного подождите, собираем ифнормацию по пользваотелю...'
+    )
+    try:
+        task_datas = await get_task_datas(int(number_task))
+        if task_datas:
+            if 'Задание перенесено в архив' in task_datas["full_text"]:
+                if int(user_id) in archive_tasks_progerss[int(number_task)]['users']['done']:
+                    if archive_tasks_progerss[int(number_task)]['users']['done'][int(user_id)]['start_date'] == '':
+                        end_date = archive_tasks_progerss[int(number_task)]['users']['done'][int(user_id)]['end_date']
+                        admin_id = archive_tasks_progerss[int(number_task)]['users']['done'][int(user_id)]['admin_id']
+                        admin_name = archive_tasks_progerss[int(number_task)]['users']['done'][int(user_id)]['admin_name']
+                        await message.delete()
+                        await user_bot.send_message(
+                            msg.from_user.id,
+                            f'Задание зачтено вручную\n\nВремя и дата: {end_date}\nId админа: {admin_id}\n\nUsername админа: {admin_name}'
+                        )
+                    else:
+                        start_date = archive_tasks_progerss[int(number_task)]['users']['done'][int(user_id)]['start_date']
+                        end_date = archive_tasks_progerss[int(number_task)]['users']['done'][int(user_id)]['end_date']
+                        admin_id = archive_tasks_progerss[int(number_task)]['users']['done'][int(user_id)]['admin_id']
+                        admin_name = archive_tasks_progerss[int(number_task)]['users']['done'][int(user_id)]['admin_name']
+                        await message.delete()
+                        await user_bot.send_message(
+                            msg.from_user.id,
+                            f'Задание зачтено через выполнения\n\nВремя начала выполнения: {start_date}\nВремя сдачи задания: {end_date}\nId админа: {admin_id}\n\nUsername админа: {admin_name}'
+                        )
+                        all_items = os.listdir(f'static/archive/{number_task}')
+                        files = [item for item in all_items if os.path.isfile(os.path.join(f'static/archive/{number_task}', item))]
+                        media = []
+                        for file in files:
+                            if str(user_id) in file:
+                                if 'mp4' in file:
+                                    media.append(types.InputMediaVideo(media=open(f'static/archive/{number_task}/{file}', 'rb')))
+                                elif 'jpg' in file:
+                                    media.append(types.InputMediaPhoto(media=open(f'static/archive/{number_task}/{file}', 'rb')))
+                        
+                        if media:
+                            await user_bot.send_media_group(
+                                msg.from_user.id, 
+                                media=media,
+                            )
+                elif int(user_id) in archive_tasks_progerss[int(number_task)]['users']['rejected']:
+                    reason = archive_tasks_progerss[int(number_task)]['users']['rejected'][int(user_id)]['reason']
+                    start_date = archive_tasks_progerss[int(number_task)]['users']['rejected'][int(user_id)]['start_date']
+                    end_date = archive_tasks_progerss[int(number_task)]['users']['rejected'][int(user_id)]['end_date']
+                    admin_id = archive_tasks_progerss[int(number_task)]['users']['rejected'][int(user_id)]['admin_id']
+                    admin_name = archive_tasks_progerss[int(number_task)]['users']['rejected'][int(user_id)]['admin_name']
+                    await message.delete()
+                    await user_bot.send_message(
+                        msg.from_user.id,
+                        f'Задание не принято\n\nВремя начала выполнения: {start_date}\nВремя сдачи задания: {end_date}\nId админа: {admin_id}\n\nUsername админа: {admin_name}\n\nПричина отклонения: {reason}'
+                    )
+                    all_items = os.listdir(f'static/archive/{number_task}')
+                    files = [item for item in all_items if os.path.isfile(os.path.join(f'static/archive/{number_task}', item))]
+                    media = []
+                    for file in files:
+                        if str(user_id) in file:
+                            if 'mp4' in file:
+                                media.append(types.InputMediaVideo(media=open(f'static/archive/{number_task}/{file}', 'rb')))
+                            elif 'jpg' in file:
+                                media.append(types.InputMediaPhoto(media=open(f'static/archive/{number_task}/{file}', 'rb')))
+                        
+                    if media:
+                        await user_bot.send_media_group(
+                            msg.from_user.id, 
+                            media=media,
+                        )
+            else:
+                if int(user_id) in tasks_progress[int(number_task)]['users']['done']:
+                    if tasks_progress[int(number_task)]['users']['done'][int(user_id)]['start_date'] == '':
+                        end_date = tasks_progress[int(number_task)]['users']['done'][int(user_id)]['end_date']
+                        admin_id = tasks_progress[int(number_task)]['users']['done'][int(user_id)]['admin_id']
+                        admin_name = tasks_progress[int(number_task)]['users']['done'][int(user_id)]['admin_name']
+                        await message.delete()
+                        await user_bot.send_message(
+                            msg.from_user.id,
+                            f'Задание зачтено вручную\n\nВремя и дата: {end_date}\nId админа: {admin_id}\n\nUsername админа: {admin_name}'
+                        )
+                    else:
+                        start_date = tasks_progress[int(number_task)]['users']['done'][int(user_id)]['start_date']
+                        end_date = tasks_progress[int(number_task)]['users']['done'][int(user_id)]['end_date']
+                        admin_id = tasks_progress[int(number_task)]['users']['done'][int(user_id)]['admin_id']
+                        admin_name = tasks_progress[int(number_task)]['users']['done'][int(user_id)]['admin_name']
+                        await message.delete()
+                        await user_bot.send_message(
+                            msg.from_user.id,
+                            f'Задание зачтено через выполнения\n\nВремя начала выполнения: {start_date}\nВремя сдачи задания: {end_date}\nId админа: {admin_id}\n\nUsername админа: {admin_name}'
+                        )
+                        all_items = os.listdir(f'static/archive/{number_task}')
+                        files = [item for item in all_items if os.path.isfile(os.path.join(f'static/archive/{number_task}', item))]
+                        media = []
+                        for file in files:
+                            if str(user_id) in file:
+                                if 'mp4' in file:
+                                    media.append(types.InputMediaVideo(media=open(f'static/archive/{number_task}/{file}', 'rb')))
+                                elif 'jpg' in file:
+                                    media.append(types.InputMediaPhoto(media=open(f'static/archive/{number_task}/{file}', 'rb')))
+                        
+                        if media:
+                            await user_bot.send_media_group(
+                                msg.from_user.id, 
+                                media=media,
+                            )
+                elif int(user_id) in tasks_progress[int(number_task)]['users']['rejected']:
+                    reason = tasks_progress[int(number_task)]['users']['rejected'][int(user_id)]['reason']
+                    start_date = tasks_progress[int(number_task)]['users']['rejected'][int(user_id)]['start_date']
+                    end_date = tasks_progress[int(number_task)]['users']['rejected'][int(user_id)]['end_date']
+                    admin_id = tasks_progress[int(number_task)]['users']['rejected'][int(user_id)]['admin_id']
+                    admin_name = tasks_progress[int(number_task)]['users']['rejected'][int(user_id)]['admin_name']
+                    await message.delete()
+                    await user_bot.send_message(
+                        msg.from_user.id,
+                        f'Задание не принято\n\nВремя начала выполнения: {start_date}\nВремя сдачи задания: {end_date}\nId админа: {admin_id}\n\nUsername админа: {admin_name}\n\nПричина отклонения: {reason}'
+                    )
+                    all_items = os.listdir(f'static/archive/{number_task}')
+                    files = [item for item in all_items if os.path.isfile(os.path.join(f'static/archive/{number_task}', item))]
+                    media = []
+                    for file in files:
+                        if str(user_id) in file:
+                            if 'mp4' in file:
+                                media.append(types.InputMediaVideo(media=open(f'static/archive/{number_task}/{file}', 'rb')))
+                            elif 'jpg' in file:
+                                media.append(types.InputMediaPhoto(media=open(f'static/archive/{number_task}/{file}', 'rb')))
+                    
+                    if media:
+                        await user_bot.send_media_group(
+                            msg.from_user.id, 
+                            media=media,
+                        )
+        else:
+            await message.delete()
+            await user_bot.send_message(
+                msg.from_user.id,
+                'Похоже такого задания не существует'
+            )
+    except:
+        await message.delete()
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Данные по заданию не найдены...'
+        )
 
 ##
 
+
+#######
+
+
+####### Общая статистика
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_stat')
+@allow_bace_access
+async def admin_stat(msg: types.Message):
+    stat_datas = await get_stat()
+    if stat_datas:
+        count_users = await get_users_count()
+        await user_bot.send_message(
+            msg.from_user.id,
+            f'Денег выплачено: {stat_datas["paid"]}\nОсталось выплатить: \nВсего человек: {count_users}\nВсего заданий: {stat_datas["count_tasks"]}\nАктивных: {int(stat_datas["count_tasks"]) - int(stat_datas["delete_tasks"])}\nУдаленных: {stat_datas["delete_tasks"]}\nВыполненных:\nВыполнений принято: {stat_datas["accepted"]}\nВыполнений отклонено: {stat_datas["rejected"]}',
+            reply_markup=admin_user_stat_kb()
+        )
+
+
+
+## Выплаты
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admip_paid')
+@allow_bace_access
+async def admin_paid(callback_query: types.CallbackQuery):
+    await user_bot.send_message(
+        callback_query.from_user.id,
+        'Выберите',
+        reply_markup=admin_user_paid_kb()
+    )
+
+@user_dp.callback_query_handler(lambda c: c.data == 'current_transactions')
+@allow_bace_access
+async def admin_all_transactions(callback_query: types.CallbackQuery):
+    if os.path.exists('static/transactions/list.xlsx'):
+        await user_bot.send_document(
+            callback_query.from_user.id,
+            document=open('static/transactions/list.xlsx', 'rb')
+        )
+        await user_bot.send_message(
+            callback_query.from_user.id,
+            'Обнулить список?',
+            reply_markup=admin_update_user_paid_kb()
+        )
+    else:
+        users = await get_users_for_paid()
+        if users:
+            workbook = openpyxl.Workbook()
+        
+            # Выбираем активный лист
+            sheet = workbook.active
+            
+            # Заголовки столбцов
+            sheet['A1'] = 'user_id'
+            sheet['B1'] = 'username'
+            sheet['C1'] = 'баланс'
+            sheet['D1'] = 'Тип банка'
+            sheet['E1'] = 'Номер карты'
+            sheet['F1'] = 'Имя банка'
+            sheet['G1'] = 'Номер телефона'
+            for index, (user_id, name, balance, type_bank, card_number, bank_name, phone_number) in enumerate(users, start=2):
+                sheet.cell(row=index, column=1, value=user_id)
+                sheet.cell(row=index, column=2, value=name)
+                sheet.cell(row=index, column=3, value=balance)
+                sheet.cell(row=index, column=4, value=type_bank)
+                sheet.cell(row=index, column=5, value=card_number)
+                sheet.cell(row=index, column=6, value=bank_name)
+                sheet.cell(row=index, column=7, value=phone_number)
+            workbook.save('static/transactions/list.xlsx')
+            await user_bot.send_document(
+                callback_query.from_user.id,
+                document=open('static/transactions/list.xlsx', 'rb')
+            )
+            await user_bot.send_message(
+                callback_query.from_user.id,
+                'Обнулить список?',
+                reply_markup=admin_update_user_paid_kb()
+            )
+        else:
+            await user_bot.send_message(
+                callback_query.from_user.id,
+                'Похоже нет пользователей с балансом больше 200'
+            )
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_back_update_paid')
+@allow_bace_access
+async def admin_update_paid_back(callback_query: types.CallbackQuery):
+    await admin_cmd_start(callback_query)
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_update_paid_list')
+@allow_bace_access
+async def admin_update_paid(callback_query: types.CallbackQuery):
+    if os.path.exists('static/transactions/list.xlsx'):
+        message = await user_bot.send_message(
+            callback_query.from_user.id,
+            'Подождите, производится снятие баланса...'
+        )
+        users = []
+        workbook = openpyxl.load_workbook('static/transactions/list.xlsx')
+        # Выбираем активный лист
+        sheet = workbook.active
+
+        # Создаем пустой список для хранения данных
+        users = []
+
+        # Проходим по строкам таблицы, начиная со второй строки (первая строка - заголовки)
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            user_id, name, balance, type_bank, card_number, bank_name, phone_number = row
+            users.append((user_id, name, balance, type_bank, card_number, bank_name, phone_number))
+        for (user_id, name, balance, type_bank, card_number, bank_name, phone_number) in users:
+            try:
+                await subtract_balance(user_id, balance)
+                await adding_stat_paid(balance)
+                await create_transaction(
+                    user_id=user_id,
+                    user_name=name,
+                    amount=int(balance),
+                    date=datetime.datetime.now()
+                )
+            except:
+                pass
+        os.remove('static/transactions/list.xlsx')
+        await message.delete()
+        await user_bot.send_message(
+            callback_query.from_user.id,
+            'Успешно!'
+        )
+    else:
+        await user_bot.send_message(
+            callback_query.from_user.id,
+            'Что-то пошло не так...'
+        )
+
+
+@user_dp.callback_query_handler(lambda c: c.data == 'all_transactions')
+@allow_bace_access
+async def admin_all_transactions(callback_query: types.CallbackQuery):
+    transactions = await get_all_transactions()
+    if transactions:
+        message = await user_bot.send_message(
+            callback_query.from_user.id,
+            'Немного подождите, формируется таблица...'
+        )
+        workbook = openpyxl.Workbook()
+    
+        # Выбираем активный лист
+        sheet = workbook.active
+            
+        # Заголовки столбцов
+        sheet['A1'] = 'user_id'
+        sheet['B1'] = 'username'
+        sheet['C1'] = 'Сумма'
+        sheet['D1'] = 'Дата и время'
+
+        for index, (user_id, user_name, amount, date) in enumerate(transactions, start=2):
+            sheet.cell(row=index, column=1, value=user_id)
+            sheet.cell(row=index, column=2, value=user_name)
+            sheet.cell(row=index, column=3, value=amount)
+            sheet.cell(row=index, column=4, value=str(date))
+        workbook.save('static/transactions/history.xlsx')
+        await message.delete()
+        await user_bot.send_document(
+            callback_query.from_user.id,
+            document=open('static/transactions/history.xlsx', 'rb')
+        )
+    else:
+        await user_bot.send_message(
+            callback_query.from_user.id,
+            'Нет никаких записей...'
+        )
+
+
+##
 
 
 
@@ -2199,6 +2627,7 @@ def load_data():
 if __name__ == '__main__':
     start_db()
     load_data()
+    create_statistic()
     block_users = get_list_of_blocks()
     from utils.scheduler import start_schedule
 
