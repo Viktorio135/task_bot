@@ -10,18 +10,78 @@ from .models import User, engine, Category, Task, TaskHistory, ArchiveTasks, Sta
 def create_user(
     user_name,
     user_id,
+    who_invite
     ):
     try:
         with Session(autoflush=False, bind=engine) as session:
             new_user = User(
                 user_name=user_name,
                 user_id=user_id,
+                who_invite=who_invite
             )
             session.add(new_user)
             session.commit()
             return 1
     except:
         return 0
+    
+@sync_to_async
+def unblock_user(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        if obj:
+            obj.is_block = False
+            session.commit()
+            return 1
+        else:
+            return 0
+        
+@sync_to_async
+def get_user_list_for_message():
+    with Session(autoflush=False, bind=engine) as session:
+        sp = []
+        obj = session.query(User).filter(User.notifications[0] == '0').all()
+        for user in obj:
+            sp.append(user.user_id)
+        return sp
+
+
+
+@sync_to_async
+def get_top_list():
+    with Session(autoflush=False, bind=engine) as session:
+        # Создаем словарь для хранения активности пользователей
+        user_activity = {}
+
+        # Получаем все записи из таблицы TaskHistory
+        obj = session.query(TaskHistory).all()
+
+        # Проходим по каждой записи и считаем количество выполненных задач для каждого пользователя
+        for user in obj:
+            done_tasks = user.done_tasks.split(' ')
+            done_tasks_count = sum(1 for task in done_tasks if task.isdigit())  # Подсчитываем количество выполненных заданий
+
+            # Обновляем словарь активности пользователей
+            if user.user_id in user_activity:
+                user_activity[user.user_id] += done_tasks_count
+            else:
+                user_activity[user.user_id] = done_tasks_count
+
+        # Преобразуем словарь в список [(user_id, активность)] и сортируем его по активности
+        top_list = sorted(user_activity.items(), key=lambda x: x[1], reverse=True)
+
+        # Возвращаем топ-10 самых активных пользователей
+        return top_list[:10]
+
+
+@sync_to_async
+def adding_ref_balance(user_id, reward):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.user_id == user_id).first()
+        if obj:
+            obj.balance = obj.balance + int(reward)
+            session.commit()
+
 
 @sync_to_async
 def create_transaction(user_id, user_name, amount, date):
@@ -269,6 +329,20 @@ def adding_wallet(user_id, type_bank, card_number, bank_name, phone_number):
     
 
 @sync_to_async
+def get_all_ref(user_id):
+    with Session(autoflush=False, bind=engine) as session:
+        obj = session.query(User).filter(User.who_invite == user_id).all()
+        if obj:
+            sp = []
+            for user in obj:
+                sp.append(user.user_id)
+            return sp
+        else:
+            return None
+
+
+
+@sync_to_async
 def get_user_data(user_id):
     try:
         with Session(autoflush=False, bind=engine) as session:
@@ -278,6 +352,7 @@ def get_user_data(user_id):
             data = {
                 "user_name": obj.user_name,
                 "user_id": obj.user_id,
+                "who_invite": obj.who_invite,
                 "ref_invitees": obj.ref_invitees,
                 "balance": obj.balance,
                 "type_bank": obj.type_bank,
@@ -306,6 +381,7 @@ def get_user_data_by_username(username):
             data = {
                 "user_name": obj.user_name,
                 "user_id": obj.user_id,
+                "who_invite": obj.who_invite,
                 "ref_invitees": obj.ref_invitees,
                 "balance": obj.balance,
                 "type_bank": obj.type_bank,

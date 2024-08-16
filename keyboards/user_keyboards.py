@@ -78,8 +78,8 @@ def support_kb():
 
 def notifications_kb(params):
     btn1 = InlineKeyboardButton(text=f'{"🔔" if params[0] == "1" else "🔕"} Новости бота', callback_data='change_notifications_news')
-    btn2 = InlineKeyboardButton(text=f'{"🔔" if params[1] == "1" else "🔕"} Нововые задания', callback_data='change_notifications_tasks')
-    btn3 = InlineKeyboardButton(text=f'{"🔔" if params[2] == "1" else "🔕"} Нововые оценки', callback_data='change_notifications_assessments')
+    btn2 = InlineKeyboardButton(text=f'{"🔔" if params[1] == "1" else "🔕"} Новые задания', callback_data='change_notifications_tasks')
+    btn3 = InlineKeyboardButton(text=f'{"🔔" if params[2] == "1" else "🔕"} Новые оценки', callback_data='change_notifications_assessments')
     btn4 = InlineKeyboardButton(text='<<', callback_data='notifications_back')
     keyboard = InlineKeyboardMarkup().add(btn1).add(btn2).add(btn3).add(btn4)
     return keyboard
@@ -135,7 +135,7 @@ async def get_all_category_kb():
         keyboard.add(btn)
     return keyboard
 
-def next_task_kb(place,category, is_hand=False, task_number=0, checking=False):
+def next_task_kb(place,category, is_hand=False, task_number=0, checking=False, done=False, rejected=False):
     if checking:
         btn1 = InlineKeyboardButton(text='📎 На проверке', callback_data='nothing')
         btn2 = InlineKeyboardButton(text='<', callback_data=f'last_task:{place-1}:{category}')
@@ -150,6 +150,20 @@ def next_task_kb(place,category, is_hand=False, task_number=0, checking=False):
         btn3 = InlineKeyboardButton(text='>', callback_data=f'next_task:{place+1}:{category}')
         btn4 = InlineKeyboardButton(text='<<', callback_data='back_tasks')
         keyboard = InlineKeyboardMarkup().add(btn1).add(btn5).add(btn2, btn3).add(btn4)
+        return keyboard
+    if done:
+        btn1 = InlineKeyboardButton('✅ Засчитано', callback_data='nothing')
+        btn2 = InlineKeyboardButton(text='<', callback_data=f'last_task:{place-1}:{category}')
+        btn3 = InlineKeyboardButton(text='>', callback_data=f'next_task:{place+1}:{category}')
+        btn4 = InlineKeyboardButton(text='<<', callback_data='back_tasks')
+        keyboard = InlineKeyboardMarkup().add(btn1).add(btn2, btn3).add(btn4)
+        return keyboard
+    if rejected:
+        btn1 = InlineKeyboardButton(text='❌ Не зачитано', callback_data='nothing')
+        btn2 = InlineKeyboardButton(text='<', callback_data=f'last_task:{place-1}:{category}')
+        btn3 = InlineKeyboardButton(text='>', callback_data=f'next_task:{place+1}:{category}')
+        btn4 = InlineKeyboardButton(text='<<', callback_data='back_tasks')
+        keyboard = InlineKeyboardMarkup().add(btn1).add(btn2, btn3).add(btn4)
         return keyboard
     else:
         btn1 = InlineKeyboardButton(text='✅ Приступить', callback_data=f'take_task:{task_number}')
@@ -214,7 +228,7 @@ def confiramtion_text_kb():
     keyboard = InlineKeyboardMarkup().add(btn1).add(btn2)
     return keyboard
 
-def search_kb(task_number, in_process=False, checking=False, default=False):
+def search_kb(task_number, in_process=False, checking=False, default=False, done=False, rejected=False):
     if in_process:
         btn1 = InlineKeyboardButton(text='❎ Сдать', callback_data=f'hand_task:{task_number}')
         btn2 = InlineKeyboardButton(text='❌ Отказаться', callback_data=f'cancel_task:{task_number}')
@@ -231,6 +245,17 @@ def search_kb(task_number, in_process=False, checking=False, default=False):
         btn2 = InlineKeyboardButton(text='<<', callback_data='back_tasks')
         keyboard = InlineKeyboardMarkup().add(btn1).add(btn2)
         return keyboard
+    elif done:
+        btn1 = InlineKeyboardButton('✅ Засчитано', callback_data='nothing')
+        btn2 = InlineKeyboardButton(text='<<', callback_data='back_tasks')
+        keyboard = InlineKeyboardMarkup().add(btn1).add(btn2)
+        return keyboard
+    elif rejected:
+        btn1 = InlineKeyboardButton(text='❌ Не зачитано', callback_data='nothing')
+        btn2 = InlineKeyboardButton(text='<<', callback_data='back_tasks')
+        keyboard = InlineKeyboardMarkup().add(btn1).add(btn2)
+        return keyboard
+
 
 def user_edit_text_kb():
     btn1 = InlineKeyboardButton(text='Понятно', callback_data='edit_text_back')

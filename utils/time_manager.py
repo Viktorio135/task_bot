@@ -1,5 +1,5 @@
-from database.db_commands import is_time_remaining, delete_active_task, adding_user_times, subtract_user_in_process
-import os, datetime
+from database.db_commands import is_time_remaining, delete_active_task, adding_user_times, subtract_user_in_process, get_task_datas, adding_archive_task, delete_task, adding_stat_del_task
+import os, datetime, shutil
 
 
 async def time_manage(tasks_progress):
@@ -34,4 +34,40 @@ async def delete_old_files():
             # Если файл старше недели, удаляем его
             if file_time < week_ago:
                 os.remove(file_path)
+
+async def checking_done_tasks(tasks_progress, archive_tasks_progress):
+    for task in dict(tasks_progress):
+        limit = tasks_progress[task]["limit"]
+        if len(tasks_progress[task]["users"]["done"]) >= int(limit):
+            task_datas = await get_task_datas(task)
+            cancelled = len(tasks_progress[task]['users']['canceled'])
+            done = len(tasks_progress[task]['users']['done'])
+            rejected = 0
+            times = 0
+            for user in tasks_progress[task]['users']['rejected']:
+                if tasks_progress[task]['users']['rejected'][user]['reason'] != 'Лимит времени':
+                    rejected += 1
+                else:
+                    times += 1
+            await adding_archive_task(
+                number_task=task_datas["id"],
+                category=task_datas["category"],
+                full_text=task_datas["full_text"],
+                small_text=task_datas["small_text"],
+                price=task_datas["price"],
+                timer=task_datas["timer"],
+                count_people=task_datas["count_people"],
+                start_date=task_datas["start_date"],
+                end_date=datetime.datetime.now(),
+                who_created=task_datas["who_created"],
+                rejected=rejected,
+                cancelled=cancelled,
+                times=times,
+                done=done
+            )
+            await delete_task(task)
+            await adding_stat_del_task()
+            archive_tasks_progress[task] = tasks_progress[task]
+            del tasks_progress[task]
+            shutil.rmtree(f'static/tasks/{task}')
                 

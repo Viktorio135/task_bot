@@ -276,3 +276,20 @@ def admin_update_user_paid_kb():
     btn2 = InlineKeyboardButton(text='<<', callback_data='admin_back_update_paid')
     keyboard = InlineKeyboardMarkup().add(btn1).add(btn2)
     return keyboard
+
+
+def admin_unblock_user_kb():
+    btn1 = InlineKeyboardButton(text='Разблокировать пользователя', callback_data='admin_unblock_user')
+    keyboard = InlineKeyboardMarkup().add(btn1)
+    return keyboard
+
+def admin_search_warn():
+    btn1 = InlineKeyboardButton(text='Поиск предупреждений по id', callback_data='admin_search_warn')
+    keyboard = InlineKeyboardMarkup().add(btn1)
+    return keyboard
+
+def admin_message_conf():
+    btn1 = InlineKeyboardButton(text='Уверен', callback_data='admin_make_message_conf')
+    btn2 = InlineKeyboardButton(text='Отмена', callback_data='admin_make_message_cancel')
+    keyboard = InlineKeyboardMarkup().add(btn1, btn2)
+    return keyboard

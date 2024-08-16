@@ -50,4 +50,16 @@ class AdminGiveTask(StatesGroup):
 class AdminSearchUserTask(StatesGroup):
     user_id = State()
     number_task = State()
-    
+
+class AdminSearchRef(StatesGroup):
+    user_id = State()
+
+class AdminUnblockUser(StatesGroup):
+    user_id = State()
+
+class AdminSearchWarn(StatesGroup):
+    user_id = State()
+
+class AdminMakeMessage(StatesGroup):
+    text = State()
+    conf = State()

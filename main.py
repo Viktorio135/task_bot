@@ -28,7 +28,7 @@ from database.models import start_db
 load_dotenv()
 user_token = os.getenv('USER_TOKEN')
 
-user_bot = Bot(token=user_token)
+user_bot = Bot(token=user_token, parse_mode='HTML', disable_web_page_preview=True)
 
 user_dp = Dispatcher(user_bot, storage=MemoryStorage())
 
@@ -133,6 +133,7 @@ async def user_check_sub_start(callback_query: types.CallbackQuery, start=True):
             user_id=callback_query.from_user.id
             )
     if user_channel_status.status != 'left':
+        ref_code = ''
         if str(callback_query.from_user.id) in cached_data:
             ref_code = cached_data[str(callback_query.from_user.id)]
             await adding_referal(ref_code)
@@ -141,6 +142,7 @@ async def user_check_sub_start(callback_query: types.CallbackQuery, start=True):
             await create_user(
                 user_name=callback_query.from_user.username,
                 user_id=str(callback_query.from_user.id),
+                who_invite=ref_code
             )
             await create_user_history(
                 user_id=str(callback_query.from_user.id)
@@ -321,6 +323,8 @@ async def user_main_menu(callback_query: types.CallbackQuery, has_register=False
                 '💵',
                 reply_markup=main_kb()
             )
+        cached_data[str(callback_query.from_user.id)] = callback_query
+        
         main_menu_icon[str(callback_query.from_user.id)] = message
         if has_register:
             await user_bot.send_message(
@@ -587,15 +591,28 @@ async def user_all_tasks_in_category(callback_query: types.CallbackQuery):
             start_time = tasks_progress[tasks_in_category[0].id]['users']['in_process'][callback_query.from_user.id]
             remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=tasks_in_category[0].timer)
             await callback_query.message.edit_text(
-                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[0].id}\n\n{tasks_in_category[0].full_text}\n\n💸 Награда: {tasks_in_category[0].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[0].timer + " мин" if tasks_in_category[0].timer != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {int(remaining_time)} мин\n\n✏️ Создано: {tasks_in_category[0].start_date}',
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[0].id}\n\n{tasks_in_category[0].full_text}\n\n💸 Награда: {tasks_in_category[0].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[0].timer + " мин" if tasks_in_category[0].timer != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {str(int(remaining_time)) + " мин" if remaining_time != "Бессрочно" else remaining_time} \n\n✏️ Создано: {tasks_in_category[0].start_date}',
                 reply_markup=next_task_kb(place=0, category=category, is_hand=True, task_number=tasks_in_category[0].id)
             )
     else:
-        await callback_query.message.edit_text(
-            text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[0].id}\n\n{tasks_in_category[0].full_text}\n\n💸 Награда: {tasks_in_category[0].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[0].timer + " мин" if tasks_in_category[0].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[0].start_date}',
-            parse_mode='HTML',
-            reply_markup=next_task_kb(place=0, category=category, task_number=tasks_in_category[0].id)   
-        )
+        if callback_query.from_user.id in tasks_progress[tasks_in_category[0].id]['users']['done']:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[0].id}\n\n{tasks_in_category[0].full_text}\n\n💸 Награда: {tasks_in_category[0].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[0].timer + " мин" if tasks_in_category[0].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[0].start_date}',
+                parse_mode='HTML',
+                reply_markup=next_task_kb(place=0, category=category, task_number=tasks_in_category[0].id, done=True)   
+            )
+        elif callback_query.from_user.id in tasks_progress[tasks_in_category[0].id]['users']['rejected']:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[0].id}\n\n{tasks_in_category[0].full_text}\n\nПричина отколнения: {tasks_progress[tasks_in_category[0].id]["users"]["rejected"][callback_query.from_user.id]["reason"]}\n\n💸 Награда: {tasks_in_category[0].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[0].timer + " мин" if tasks_in_category[0].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[0].start_date}',
+                parse_mode='HTML',
+                reply_markup=next_task_kb(place=0, category=category, task_number=tasks_in_category[0].id, rejected=True)   
+            )
+        else:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[0].id}\n\n{tasks_in_category[0].full_text}\n\n💸 Награда: {tasks_in_category[0].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[0].timer + " мин" if tasks_in_category[0].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[0].start_date}',
+                parse_mode='HTML',
+                reply_markup=next_task_kb(place=0, category=category, task_number=tasks_in_category[0].id)   
+            )
 
 @user_dp.callback_query_handler(lambda c: 'next_task' in c.data)
 @block_check
@@ -618,15 +635,28 @@ async def user_all_tasks_in_category_next(callback_query: types.CallbackQuery):
             start_time = tasks_progress[tasks_in_category[place].id]['users']['in_process'][callback_query.from_user.id]
             remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=tasks_in_category[place].timer)
             await callback_query.message.edit_text(
-                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️ Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {int(remaining_time)} мин\n\n✏️ Создано: {tasks_in_category[place].start_date}',
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️ Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {str(int(remaining_time)) + " мин" if remaining_time != "Бессрочно" else remaining_time}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
                 reply_markup=next_task_kb(place=place, category=category, is_hand=True, task_number=tasks_in_category[place].id)
             )
     else:
-        await callback_query.message.edit_text(
-            text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️ Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
-            parse_mode='HTML',
-            reply_markup=next_task_kb(place=place, category=category, task_number=tasks_in_category[place].id)   
-        )
+        if callback_query.from_user.id in tasks_progress[tasks_in_category[place].id]['users']['done']:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
+                parse_mode='HTML',
+                reply_markup=next_task_kb(place=place, category=category, task_number=tasks_in_category[place].id, done=True)   
+            )
+        elif callback_query.from_user.id in tasks_progress[tasks_in_category[place].id]['users']['rejected']:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\nПричина отколнения: {tasks_progress[tasks_in_category[place].id]["users"]["rejected"][callback_query.from_user.id]["reason"]}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
+                parse_mode='HTML',
+                reply_markup=next_task_kb(place=place, category=category, task_number=tasks_in_category[place].id, rejected=True)   
+            )
+        else:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
+                parse_mode='HTML',
+                reply_markup=next_task_kb(place=place, category=category, task_number=tasks_in_category[place].id)   
+            )
     
 @user_dp.callback_query_handler(lambda c: 'last_task' in c.data)
 @block_check
@@ -649,15 +679,28 @@ async def user_all_tasks_in_category_last(callback_query: types.CallbackQuery):
             start_time = tasks_progress[tasks_in_category[place].id]['users']['in_process'][callback_query.from_user.id]
             remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=tasks_in_category[place].timer)
             await callback_query.message.edit_text(
-                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️ Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {int(remaining_time)} мин\n\n✏️ Создано: {tasks_in_category[place].start_date}',
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️ Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {str(int(remaining_time)) + " мин" if remaining_time != "Бессрочно" else remaining_time}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
                 reply_markup=next_task_kb(place=place, category=category, is_hand=True, task_number=tasks_in_category[place].id)
             )
     else:
-        await callback_query.message.edit_text(
-            text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️ Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
-            parse_mode='HTML',
-            reply_markup=next_task_kb(place=place, category=category, task_number=tasks_in_category[place].id)   
-        )
+        if callback_query.from_user.id in tasks_progress[tasks_in_category[place].id]['users']['done']:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
+                parse_mode='HTML',
+                reply_markup=next_task_kb(place=place, category=category, task_number=tasks_in_category[place].id, done=True)   
+            )
+        elif callback_query.from_user.id in tasks_progress[tasks_in_category[place].id]['users']['rejected']:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\nПричина отколнения: {tasks_progress[tasks_in_category[place].id]["users"]["rejected"][callback_query.from_user.id]["reason"]}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
+                parse_mode='HTML',
+                reply_markup=next_task_kb(place=place, category=category, task_number=tasks_in_category[place].id, rejected=True)   
+            )
+        else:
+            await callback_query.message.edit_text(
+                text=f'🏷️ Категория "{category}"\n\n❗ Задание #{tasks_in_category[place].id}\n\n{tasks_in_category[place].full_text}\n\n💸 Награда: {tasks_in_category[place].price}₽\n\n⏱️Время на выполнение: {tasks_in_category[place].timer + " мин" if tasks_in_category[place].timer != "00" else "бессрочно"}\n\n✏️ Создано: {tasks_in_category[place].start_date}',
+                parse_mode='HTML',
+                reply_markup=next_task_kb(place=place, category=category, task_number=tasks_in_category[place].id)   
+            )
 ##
 
 ## приступить к задаче в списке задач
@@ -667,7 +710,7 @@ async def user_all_tasks_in_category_take_task(callback_query: types.CallbackQue
     task_number = callback_query.data.split(':')[1]
     task = await get_task_datas(int(task_number))
     if task['id'] in tasks_progress:
-        if len(tasks_progress[task['id']]['users']['in_process']) + len(tasks_progress[task['id']]['users']['done']) + 1 <= int(tasks_progress[task['id']]['limit']):
+        if len(tasks_progress[task['id']]['users']['in_process']) + len(tasks_progress[task['id']]['users']['checking']) + len(tasks_progress[task['id']]['users']['done']) + 1 <= int(tasks_progress[task['id']]['limit']):
             await adding_new_activa_task(str(callback_query.from_user.id), task['id'])
             await adding_user_in_process(str(callback_query.from_user.id))
             if callback_query.from_user.id in tasks_progress[task['id']]['users']['canceled']:
@@ -712,7 +755,7 @@ async def user_show_full_task(callback_query: types.CallbackQuery, task_number):
     start_time = tasks_progress[task["id"]]['users']['in_process'][callback_query.from_user.id]
     remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=task["timer"])
     await callback_query.message.edit_text(
-        text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {int(remaining_time)} мин\n\n✏️ Создано: {task["start_date"]}',
+        text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {str(int(remaining_time)) + " мин" if remaining_time != "Бессрочно" else remaining_time} \n\n✏️ Создано: {task["start_date"]}',
         reply_markup=new_task_accept_kb(task["id"])
     )
     
@@ -725,7 +768,7 @@ async def user_accept_new_task(callback_query: types.CallbackQuery):
     task_number = callback_query.data.split(':')[1]
     task = await get_task_datas(int(task_number))
     if task['id'] in tasks_progress:
-        if len(tasks_progress[task['id']]['users']['in_process']) + len(tasks_progress[task['id']]['users']['done']) + 1 <= int(tasks_progress[task['id']]['limit']):
+        if len(tasks_progress[task['id']]['users']['in_process']) + len(tasks_progress[task['id']]['users']['checking']) + len(tasks_progress[task['id']]['users']['done']) + 1 <= int(tasks_progress[task['id']]['limit']):
             await adding_new_activa_task(str(callback_query.from_user.id), task['id'])
             await adding_user_in_process(str(callback_query.from_user.id))
             await callback_query.message.delete() 
@@ -855,7 +898,7 @@ async def user_my_task_active(callback_query: types.CallbackQuery):
         start_time = tasks_progress[task["id"]]['users']['in_process'][callback_query.from_user.id]
         remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=task["timer"])
         await callback_query.message.edit_text(
-            text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {int(remaining_time)} мин\n\n✏️ Создано: {task["start_date"]}',
+            text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {str(int(remaining_time)) + " мин" if remaining_time != "Бессрочно" else remaining_time}\n\n✏️ Создано: {task["start_date"]}',
             reply_markup=my_task_active_kb(place=0, category=cat, task_number=task["id"])
         )
     else:
@@ -876,7 +919,7 @@ async def user_my_task_active_next(callback_query: types.CallbackQuery):
     start_time = tasks_progress[task["id"]]['users']['in_process'][callback_query.from_user.id]
     remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=task["timer"])
     await callback_query.message.edit_text(
-        text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {int(remaining_time)} мин\n\n✏️ Создано: {task["start_date"]}',
+        text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {str(int(remaining_time)) + " мин" if remaining_time != "Бессрочно" else remaining_time}\n\n✏️ Создано: {task["start_date"]}',
         reply_markup=my_task_active_kb(place=place, category=cat, task_number=task["id"])
     )
 
@@ -892,7 +935,7 @@ async def user_my_task_active_last(callback_query: types.CallbackQuery):
     start_time = tasks_progress[task["id"]]['users']['in_process'][callback_query.from_user.id]
     remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=task["timer"])
     await callback_query.message.edit_text(
-        text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {int(remaining_time)} мин\n\n✏️ Создано: {task["start_date"]}',
+        text=f'🏷️ Категория "{task["category"]}"\n\n❗ Задание #{task["id"]}\n\n{task["full_text"]}\n\n💸 Награда: {task["price"]}₽\n\n⏱️ Время на выполнение: {task["timer"] + " мин" if task["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {str(int(remaining_time)) + " мин" if remaining_time != "Бессрочно" else remaining_time}\n\n✏️ Создано: {task["start_date"]}',
         reply_markup=my_task_active_kb(place=place, category=cat, task_number=task["id"])
     )
 
@@ -939,14 +982,20 @@ async def user_cancel_task(callback_query: types.CallbackQuery):
 @block_check
 async def user_hand_task(callback_query: types.CallbackQuery, state: FSMContext):
     task_number = callback_query.data.split(':')[1]
-    await callback_query.message.edit_text(
-        text='Отправьте подтверждение (фотографии или видео)',
-        reply_markup=confiramtion_file_kb()
-    )
-    await Confirmation.task_number.set()
-    async with state.proxy() as data:
-        data["task_number"] = task_number
-    await Confirmation.file.set()
+    if callback_query.from_user.id not in tasks_progress[int(task_number)]['users']['rejected']:
+        await callback_query.message.edit_text(
+            text='Отправьте подтверждение (фотографии или видео)',
+            reply_markup=confiramtion_file_kb()
+        )
+        await Confirmation.task_number.set()
+        async with state.proxy() as data:
+            data["task_number"] = task_number
+        await Confirmation.file.set()
+    else:
+        await callback_query.message.edit_text(
+            text='Похоже ваше время и так вышло!',
+            reply_markup=cancel_task_kb()
+        )
 
 
 
@@ -1091,25 +1140,71 @@ async def user_search_task_state(msg: types.Message, state: FSMContext):
     task_data = await get_task_datas(int(data['number_task']))
     await state.finish()
     if task_data:
-        if msg.from_user.id in tasks_progress[int(data['number_task'])]['users']['in_process']:
-            start_time = tasks_progress[task_data["id"]]['users']['in_process'][msg.from_user.id]
-            remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=task_data["timer"])
-            await callback.message.edit_text(
-                text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {int(remaining_time)} мин\n\n✏️ Создано: {task_data["start_date"]}',
-                reply_markup=search_kb(task_number=int(data['number_task']), in_process=True)
-            )
-        elif msg.from_user.id in tasks_progress[int(data['number_task'])]['users']['checking']:
-            await callback.message.edit_text(
-                text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
-                parse_mode='HTML',
-                reply_markup=search_kb(task_number=int(data['number_task']), checking=True)
-            )
+        if int(data['number_task']) in tasks_progress:
+            if msg.from_user.id in tasks_progress[int(data['number_task'])]['users']['in_process']:
+                start_time = tasks_progress[task_data["id"]]['users']['in_process'][msg.from_user.id]
+                remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=task_data["timer"])
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {str(int(remaining_time)) + " мин" if remaining_time != "Бессрочно" else remaining_time}\n\n✏️ Создано: {task_data["start_date"]}',
+                    reply_markup=search_kb(task_number=int(data['number_task']), in_process=True)
+                )
+            elif msg.from_user.id in tasks_progress[int(data['number_task'])]['users']['checking']:
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
+                    parse_mode='HTML',
+                    reply_markup=search_kb(task_number=int(data['number_task']), checking=True)
+                )
+            elif msg.from_user.id in tasks_progress[int(data['number_task'])]['users']['done']:
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
+                    parse_mode='HTML',
+                    reply_markup=search_kb(task_number=int(data['number_task']), done=True)
+                )
+            elif msg.from_user.id in tasks_progress[int(data['number_task'])]['users']['rejected']:
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\nПричина отколнения: {tasks_progress[int(data["number_task"])]["users"]["rejected"][msg.from_user.id]["reason"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
+                    parse_mode='HTML',
+                    reply_markup=search_kb(task_number=int(data['number_task']), rejected=True)
+                )
+            else:
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
+                    parse_mode='HTML',
+                    reply_markup=search_kb(task_number=int(data['number_task']), default=True)
+                )
         else:
-            await callback.message.edit_text(
-                text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
-                parse_mode='HTML',
-                reply_markup=search_kb(task_number=int(data['number_task']), default=True)
-            )
+            if msg.from_user.id in archive_tasks_progerss[int(data['number_task'])]['users']['in_process']:
+                start_time = archive_tasks_progerss[task_data["id"]]['users']['in_process'][msg.from_user.id]
+                remaining_time = await is_time_remaining(start_time=start_time, duration_minutes=task_data["timer"])
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n⌛️ Осталось времени: {str(int(remaining_time)) + " мин" if remaining_time != "Бессрочно" else remaining_time}\n\n✏️ Создано: {task_data["start_date"]}',
+                    reply_markup=search_kb(task_number=int(data['number_task']), in_process=True)
+                )
+            elif msg.from_user.id in archive_tasks_progerss[int(data['number_task'])]['users']['checking']:
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
+                    parse_mode='HTML',
+                    reply_markup=search_kb(task_number=int(data['number_task']), checking=True)
+                )
+            elif msg.from_user.id in archive_tasks_progerss[int(data['number_task'])]['users']['done']:
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
+                    parse_mode='HTML',
+                    reply_markup=search_kb(task_number=int(data['number_task']), done=True)
+                )
+            elif msg.from_user.id in archive_tasks_progerss[int(data['number_task'])]['users']['rejected']:
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\nПричина отколнения: {archive_tasks_progerss[int(data["number_task"])]["users"]["rejected"][msg.from_user.id]["reason"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
+                    parse_mode='HTML',
+                    reply_markup=search_kb(task_number=int(data['number_task']), rejected=True)
+                )
+            else:
+                await callback.message.edit_text(
+                    text=f'🏷️ Категория "{task_data["category"]}"\n\n❗ Задание #{task_data["id"]}\n\n{task_data["full_text"]}\n\n💸 Награда: {task_data["price"]}₽\n\n⏱️ Время на выполнение: {task_data["timer"] + " мин" if task_data["timer"] != "00" else "бессрочно"}\n\n✏️ Создано: {task_data["start_date"]}',
+                    parse_mode='HTML',
+                    reply_markup=search_kb(task_number=int(data['number_task']), default=True)
+                )
+
     else:
         await callback.message.edit_text(
                 text='Похоже такого задания не существует...',
@@ -1196,7 +1291,7 @@ async def admin_new_task_state_category(msg: types.Message, state: FSMContext):
 @allow_vip_access
 async def admin_new_task_state_fulltext(msg: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        data["full_text"] = msg.text
+        data["full_text"] = msg.html_text
     await AdminNewCategory.next()
     await user_bot.send_message(
         msg.from_user.id,
@@ -1208,7 +1303,7 @@ async def admin_new_task_state_fulltext(msg: types.Message, state: FSMContext):
 @allow_vip_access
 async def admin_new_task_state_smalltext(msg: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        data["small_text"] = msg.text
+        data["small_text"] = msg.html_text
     await AdminNewCategory.next()
     await user_bot.send_message(
         msg.from_user.id,
@@ -1219,46 +1314,69 @@ async def admin_new_task_state_smalltext(msg: types.Message, state: FSMContext):
 @user_dp.message_handler(state=AdminNewCategory.price)
 @allow_vip_access
 async def admin_new_task_state_price(msg: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data["price"] = msg.text
-    await AdminNewCategory.next()
-    await user_bot.send_message(
-        msg.from_user.id,
-        'Введите время в минутах, если задание бессрочное, введите "00"',
-        reply_markup=new_task_cancel()
-    )
-
+    if msg.text.isdigit():
+        async with state.proxy() as data:
+            data["price"] = msg.text
+        await AdminNewCategory.next()
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Введите время в минутах, если задание бессрочное, введите "00"',
+            reply_markup=new_task_cancel()
+        )
+    else:
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Необходимо ввести число!\n\nВведите цену задания',
+            reply_markup=new_task_cancel()
+        )
+        return
 
 @user_dp.message_handler(state=AdminNewCategory.timer)
 @allow_vip_access
 async def admin_new_task_state_timer(msg: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data["timer"] = msg.text
-    await AdminNewCategory.next()
-    await user_bot.send_message(
-        msg.from_user.id,
-        'Введите количество людей, которые смогут выполнить задание',
-        reply_markup=new_task_cancel()
-    )
+    if msg.text.isdigit():
+        async with state.proxy() as data:
+            data["timer"] = msg.text
+        await AdminNewCategory.next()
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Введите количество людей, которые смогут выполнить задание',
+            reply_markup=new_task_cancel()
+        )
+    else:
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Необходимо ввести число!\n\nВведите время в минутах, если задание бессрочное, введите "00"',
+            reply_markup=new_task_cancel()
+        )
+        return
 
 
 @user_dp.message_handler(state=AdminNewCategory.count_people)
 @allow_vip_access
 async def admin_new_task_state_countpeople(msg: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data["count_people"] = msg.text
-    await AdminNewCategory.next()
-    await user_bot.send_message(
-        msg.from_user.id,
-        'так будет выглядеть задание:\n\nВсё верно?'
-    )
-    await user_bot.send_message(
-        msg.from_user.id,
-        f'🏷️ Категория: "{data["category"]}"\n\n❗ Задание #{await get_last_task() + 1}\n\nКратко:\n{data["small_text"]}\nПолная формулировка:\n{data["full_text"]}\n\n💸 Награда: {data["price"]}₽\n\n⏱️ Время на выполнение: {data["timer"]  + " мин" if data["timer"] != "00" else "бессрочно"}\n\nЛимит выполнений: {data["count_people"]}',
-        reply_markup=new_task_conf(),
-        parse_mode='HTML',
-        disable_web_page_preview=True
-    )
+    if msg.text.isdigit():
+        async with state.proxy() as data:
+            data["count_people"] = msg.text
+        await AdminNewCategory.next()
+        await user_bot.send_message(
+            msg.from_user.id,
+            'так будет выглядеть задание:\n\nВсё верно?'
+        )
+        await user_bot.send_message(
+            msg.from_user.id,
+            f'🏷️ Категория: "{data["category"]}"\n\n❗ Задание #{await get_last_task() + 1}\n\nКратко:\n{data["small_text"]}\nПолная формулировка:\n{data["full_text"]}\n\n💸 Награда: {data["price"]}₽\n\n⏱️ Время на выполнение: {data["timer"]  + " мин" if data["timer"] != "00" else "бессрочно"}\n\nЛимит выполнений: {data["count_people"]}',
+            reply_markup=new_task_conf(),
+            parse_mode='HTML',
+            disable_web_page_preview=True
+        )
+    else:
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Необходимо ввести число!\n\nВведите количество людей, которые смогут выполнить задание',
+            reply_markup=new_task_cancel()
+        )
+        return
 
 @user_dp.callback_query_handler(lambda c: c.data == 'new_task_send', state=AdminNewCategory.confirmation)
 @allow_vip_access
@@ -1298,6 +1416,7 @@ async def admin_new_task_state_conf(callback_query: types.CallbackQuery, state: 
     list_of_users = await get_users_list_for_task()
     async def send_message_to_user(user_id):
         try:
+            user_datas = await get_user_data(str(user_id))            
             await user_bot.send_message(
                 int(user_id),
                 f'Появилось новое задание!\n\nОписание:\n{data["small_text"]}\n\nПриступить к выполнению задания?',
@@ -1650,6 +1769,7 @@ async def admin_checking_task_accept(callback_query: types.CallbackQuery):
     number_task = callback_query.data.split(':')[1]
     user_id = callback_query.data.split(':')[2]
     place = callback_query.data.split(':')[3]
+    user_datas = await get_user_data(user_id)
     tasks_progress[int(number_task)]['users']['done'][int(user_id)] = {
         'start_date': tasks_progress[int(number_task)]['users']['checking'][int(user_id)]['start_date'],
         'end_date': tasks_progress[int(number_task)]['users']['checking'][int(user_id)]['end_date'],
@@ -1671,6 +1791,8 @@ async def admin_checking_task_accept(callback_query: types.CallbackQuery):
                 shutil.move(f'static/tasks/{number_task}/{file}', f'static/archive/{number_task}/{file}')
     task_datas = await get_task_datas(int(number_task))
     await adding_balance(user_id=user_id, reward=task_datas["price"])
+    if user_datas["who_invite"] != '':
+        await adding_ref_balance(user_datas["who_invite"], int(int(task_datas["price"]) * 0.15))
     await adding_stat_accepted()
     await callback_query.message.delete()
     if callback_query.from_user.id in admin_checking_cach:
@@ -1742,11 +1864,13 @@ async def admin_checking_task_reject_state(msg: types.Message, state: FSMContext
     await adding_user_rejected(data['user_id'])
     await adding_new_history_task(data['user_id'], data['number_task'])
     await adding_stat_rejected()
-    await user_bot.send_message(
-        int(data['user_id']),
-        f'Задание #{data["number_task"]} было отклонено,\n\nПричина: {data["couse"]}',
-        reply_markup=user_edit_text_kb()
-    )
+    user_datas = await get_user_data(data["user_id"])
+    if user_datas["notifications"][2] != '0':
+        await user_bot.send_message(
+            int(data['user_id']),
+            f'Задание #{data["number_task"]} было отклонено,\n\nПричина: {data["couse"]}',
+            reply_markup=user_edit_text_kb()
+        )
     await state.finish()
     await admin_checking_task(msg, number_task=data['number_task'], place=int(data['place'])-1)
 
@@ -1932,6 +2056,7 @@ async def admin_users_warnings(callback_query: types.CallbackQuery):
         warn_len = len(warnings[int(user_id)])
     if len(warning) != 0:
         await user_bot.send_message(
+            callback_query.from_user.id,
             f'У пользователя уже {warn_len} предупреждений.\n\n{warning}',
             reply_markup=admin_users_warnings_kb(user_id)
         )
@@ -2118,7 +2243,10 @@ async def admin_give_done_task_state(msg: types.Message, state: FSMContext):
             }
             task_datas = await get_task_datas(int(data["number_task"]))
             await adding_stat_accepted()
-            await adding_balance(int(data["user_id"]), int(task_datas["price"]))
+            user_datas = await get_user_data(data["user_id"])
+            if user_datas["who_invite"] != '':
+                await adding_ref_balance(user_datas["who_invite"], int(int(task_datas["price"]) * 0.15))
+            await adding_balance(data["user_id"], int(task_datas["price"]))
             if data['number_task'] in await get_all_active_tasks(data["user_id"]):
                 await delete_active_task(data["user_id"], data['number_task'])
             if data['number_task'] not in await get_all_history_tasks(data["user_id"]):
@@ -2160,6 +2288,9 @@ async def admin_give_done_task_state(msg: types.Message, state: FSMContext):
                 await adding_new_done_task(data["user_id"], data['number_task'])
             task_datas = await get_archive_task_datas(int(data['number_task']))
             await adding_balance(int(data["user_id"]), int(task_datas["price"]))
+            user_datas = await get_user_data(data["user_id"])
+            if user_datas["who_invite"] != '':
+                await adding_ref_balance(user_datas["who_invite"], int(int(task_datas["price"]) * 0.15))
             await adding_stat_accepted()
             await message.delete()
             await user_bot.send_message(
@@ -2431,7 +2562,7 @@ async def admin_show_all_user_task(msg: types.Message, user_id, number_task):
 ####### Общая статистика
 
 @user_dp.callback_query_handler(lambda c: c.data == 'admin_stat')
-@allow_bace_access
+@allow_vip_access
 async def admin_stat(msg: types.Message):
     stat_datas = await get_stat()
     if stat_datas:
@@ -2447,7 +2578,7 @@ async def admin_stat(msg: types.Message):
 ## Выплаты
 
 @user_dp.callback_query_handler(lambda c: c.data == 'admip_paid')
-@allow_bace_access
+@allow_vip_access
 async def admin_paid(callback_query: types.CallbackQuery):
     await user_bot.send_message(
         callback_query.from_user.id,
@@ -2456,7 +2587,7 @@ async def admin_paid(callback_query: types.CallbackQuery):
     )
 
 @user_dp.callback_query_handler(lambda c: c.data == 'current_transactions')
-@allow_bace_access
+@allow_vip_access
 async def admin_all_transactions(callback_query: types.CallbackQuery):
     if os.path.exists('static/transactions/list.xlsx'):
         await user_bot.send_document(
@@ -2509,12 +2640,12 @@ async def admin_all_transactions(callback_query: types.CallbackQuery):
             )
 
 @user_dp.callback_query_handler(lambda c: c.data == 'admin_back_update_paid')
-@allow_bace_access
+@allow_vip_access
 async def admin_update_paid_back(callback_query: types.CallbackQuery):
     await admin_cmd_start(callback_query)
 
 @user_dp.callback_query_handler(lambda c: c.data == 'admin_update_paid_list')
-@allow_bace_access
+@allow_vip_access
 async def admin_update_paid(callback_query: types.CallbackQuery):
     if os.path.exists('static/transactions/list.xlsx'):
         message = await user_bot.send_message(
@@ -2559,7 +2690,7 @@ async def admin_update_paid(callback_query: types.CallbackQuery):
 
 
 @user_dp.callback_query_handler(lambda c: c.data == 'all_transactions')
-@allow_bace_access
+@allow_vip_access
 async def admin_all_transactions(callback_query: types.CallbackQuery):
     transactions = await get_all_transactions()
     if transactions:
@@ -2596,15 +2727,264 @@ async def admin_all_transactions(callback_query: types.CallbackQuery):
         )
 
 
+
+
 ##
 
+## Рефералы
 
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_ref')
+@allow_vip_access
+async def admin_ref(callback_query: types.CallbackQuery):
+    await AdminSearchRef.user_id.set()
+    await user_bot.send_message(
+        callback_query.from_user.id,
+        'Введите id пользователя'
+    )
+
+@user_dp.message_handler(state=AdminSearchRef.user_id)
+@allow_vip_access
+async def admin_ref_state(msg: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["user_id"] = msg.text
+    await state.finish()
+    users = await get_all_ref(data["user_id"])
+    if users:
+        await user_bot.send_message(
+            msg.from_user.id,
+            f'Количество приглашений: {len(users)}\n\nСписок проглашенных пользователей: {" ".join(users)}'
+        )
+    else:
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Похоже такого пользоватлея не существует'
+        )
+
+##
+
+## Топ активности
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_top')
+@allow_vip_access
+async def admin_top_activity(callback_query: types.CallbackQuery):
+    message = await user_bot.send_message(
+        callback_query.from_user.id,
+        'Немного подождите, формируется топ активности...'
+    )
+    top_list = await get_top_list()
+    top = ''
+    for index, (user_id, activity) in enumerate(top_list, start=1):
+        top += f'{index}. {user_id} - {activity} выполненных заданий\n'
+    await message.delete()
+    await user_bot.send_message(
+        callback_query.from_user.id,
+        f'Топ 10 пользователей по активности:\n\n{top}'
+    )
+
+##
+
+## Предупреждения и блокировки
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_warn_and_block')
+@allow_vip_access
+async def admin_warn_and_blocks(callback_query: types.CallbackQuery):
+    message = await user_bot.send_message(
+        callback_query.from_user.id,
+        'Немного подождите, формируются таблицы...'
+    )
+    workbook = openpyxl.Workbook()
+    
+    # Выбираем активный лист
+    sheet = workbook.active
+            
+    # Заголовки столбцов
+    sheet['A1'] = 'user_id'
+    for index, user_id in enumerate(block_users, start=2):
+        sheet.cell(row=index, column=1, value=user_id)
+    workbook.save('static/excel/block_users.xlsx')
+    workbook = openpyxl.Workbook()
+    
+    # Выбираем активный лист
+    sheet = workbook.active
+            
+    # Заголовки столбцов
+    sheet['A1'] = 'user_id'
+    sheet['B1'] = 'количество предупреждений'
+    for index, user_id in enumerate(warnings, start=2):
+        sheet.cell(row=index, column=1, value=user_id)
+        sheet.cell(row=index, column=2, value=len(warnings[int(user_id)]))
+    workbook.save('static/excel/warnings.xlsx')
+    await message.delete()
+    await user_bot.send_document(
+        callback_query.from_user.id,
+        document=open('static/excel/warnings.xlsx', 'rb'),
+        caption='Список предупреждений',
+        reply_markup=admin_search_warn()
+
+    )
+    await user_bot.send_document(
+        callback_query.from_user.id,
+        document=open('static/excel/block_users.xlsx', 'rb'),
+        caption='Список заблокированных пользователей',
+        reply_markup=admin_unblock_user_kb()
+    )
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_unblock_user')
+@allow_vip_access
+async def admin_unblock_user(callback_query: types.CallbackQuery):
+    await AdminUnblockUser.user_id.set()
+    await user_bot.send_message(
+        callback_query.from_user.id,
+        'Введите id пользователя, которого хотите разблокировать:'
+    )
+
+@user_dp.message_handler(state=AdminUnblockUser.user_id)
+@allow_vip_access
+async def admin_unblock_user_state(msg: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["user_id"] = msg.text
+    await state.finish()
+    if await unblock_user(data['user_id']):
+        if int(data['user_id']) in block_users:
+            block_users.remove(int(data['user_id']))
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Пользователь разблокирован!'
+        )
+    else:
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Похоже такого пользователя не существует'
+        )
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_search_warn')
+@allow_vip_access
+async def admin_searc_warn(callback_query: types.CallbackQuery):
+    await AdminSearchWarn.user_id.set()
+    await user_bot.send_message(
+        callback_query.from_user.id,
+        'Введите id пользователя'
+    )
+
+@user_dp.message_handler(state=AdminSearchWarn.user_id)
+@allow_vip_access
+async def admin_searc_warn_state(msg: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["user_id"] = msg.text
+    await state.finish()
+    warning = ''
+    if int(data["user_id"]) in warnings:
+        for index, war in enumerate(warnings[int(data["user_id"])], start=1):
+            warning += f'{index}: {war}\n'
+        warn_len = len(warnings[int(data["user_id"])])
+    if len(warning) != 0:
+        await user_bot.send_message(
+            msg.from_user.id,
+            f'У пользователя уже {warn_len} предупреждений.\n\n{warning}',
+            reply_markup=admin_users_warnings_kb(data["user_id"])
+        )
+    else:
+        await user_bot.send_message(
+            msg.from_user.id,
+            'У данного пользователя нет предупреждений, либо вы ошиблись в ID'
+        )
+
+##
 
     
-    
+####### Рассылка
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_message')
+@allow_vip_access
+async def admin_message(callback_query: types.CallbackQuery):
+    await AdminMakeMessage.text.set()
+    await user_bot.send_message(
+        callback_query.from_user.id,
+        'Введите текст рассылки',
+    )
+
+@user_dp.message_handler(state=AdminMakeMessage.text)
+@allow_vip_access
+async def admin_message_state(msg: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["text"] = msg.text
+    await AdminMakeMessage.conf.set()
+    await user_bot.send_message(
+        msg.from_user.id,
+        'Сообщение будет выглядеть вот так:\n\nВы уверены?'
+    )
+    await user_bot.send_message(
+        msg.from_user.id,
+        data['text'],
+        reply_markup=admin_message_conf()
+    )
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_make_message_conf', state=AdminMakeMessage.conf)
+@allow_vip_access
+async def admin_message_state_conf(callback_query: types.CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        data["conf"] = 'Yes'
+    await state.finish()
+    message = await user_bot.send_message(
+        callback_query.from_user.id,
+        'Подождите. идет рассылка...'
+    )
+    users = await get_user_list_for_message()
+    if users:
+        async def send_message_to_user(user_id):
+            try:
+                await user_bot.send_message(
+                    int(user_id),
+                    data["text"],
+                    parse_mode='HTML',
+                    reply_markup=user_edit_text_kb(),
+                )
+                return True
+            except:
+                return False
+
+        tasks = [send_message_to_user(user) for user in users]
+        results = await asyncio.gather(*tasks)
+        await message.delete()
+        await user_bot.send_message(
+            callback_query.from_user.id,
+            f'Сообщение отправлено {results} пользователям'
+        )
+
+@user_dp.callback_query_handler(lambda c: c.data == 'admin_make_message_cancel', state=AdminMakeMessage.conf)
+@allow_vip_access
+async def admin_message_state_cancel(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.finish()
+    await user_bot.send_message(
+        callback_query.from_user.id,
+        'Действие отменено'
+    )
+
+
+#######
+
+from utils.dump import dump_dicts
+
+@user_dp.message_handler(commands='create_backups')
+@allow_vip_access
+async def admin_create_backups(msg: types.Message):
+    up = await dump_dicts(cached_data, main_menu_icon, tasks_progress, archive_tasks_progerss, warnings)
+    if up:
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Бэкап создан'
+        )
+    else:
+        await user_bot.send_message(
+            msg.from_user.id,
+            'Что-то пошло не так'
+        )
+
 
 
 ####### Подгрузка бэкапов
+
+
 
 def load_data():
     global cached_data, main_menu_icon, tasks_progress
@@ -2617,6 +2997,12 @@ def load_data():
     if os.path.exists('backups/tasks_progress.pkl'):
         with open('backups/tasks_progress.pkl', 'rb') as file:
             tasks_progress = pickle.load(file)
+    if os.path.exists('backups/archive_tasks_progerss.pkl'):
+        with open('backups/archive_tasks_progerss.pkl', 'rb') as file:
+            archive_tasks_progerss = pickle.load(file)
+    if os.path.exists('backups/warnings.pkl'):
+        with open('backups/warnings.pkl', 'rb') as file:
+            warnings = pickle.load(file)
 
 
 
@@ -2632,7 +3018,7 @@ if __name__ == '__main__':
     from utils.scheduler import start_schedule
 
     scheduler = AsyncIOScheduler()
-    thread_backup_dicts = threading.Thread(target=start_schedule, daemon=True, args=(scheduler, cached_data, main_menu_icon, tasks_progress))
+    thread_backup_dicts = threading.Thread(target=start_schedule, daemon=True, args=(scheduler, cached_data, main_menu_icon, tasks_progress, archive_tasks_progerss, warnings))
     thread_backup_dicts.start()
     scheduler.start()
     

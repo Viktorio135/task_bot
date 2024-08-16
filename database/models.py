@@ -33,6 +33,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     user_name = Column(String(100))
     user_id = Column(String(100))
+    who_invite = Column(String(100), default='')
     ref_invitees = Column(Integer, default=0)
     balance = Column(Integer, default=0)
     type_bank = Column(String(100), default='')
